@@ -1,6 +1,6 @@
 @import "vars.scss";
 @import "multiselect.scss";
-@import "node_modules/bootstrap/scss/bootstrap";
+@import "bootstrap/scss/bootstrap";
 
 #app {
     font-family:
@@ -596,16 +596,6 @@ optgroup {
 
 .spinner {
     color: $primary;
-}
-
-.prism-editor__textarea {
-    outline: none !important;
-}
-
-.prism-editor__container {
-    .important {
-        font-weight: var(--bs-body-font-weight) !important;
-    }
 }
 
 h5.settings-subheading::after {

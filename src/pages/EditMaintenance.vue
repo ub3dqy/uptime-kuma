@@ -264,8 +264,7 @@
                                         v-model="maintenance.timeRange"
                                         :dark="$root.isDark"
                                         timePicker
-                                        disableTimeRangeValidation
-                                        range
+                                        :range="{ disableTimeRangeValidation: true }"
                                     />
                                 </div>
                             </template>
@@ -444,7 +443,7 @@
 
 <script>
 import VueMultiselect from "vue-multiselect";
-import Datepicker from "@vuepic/vue-datepicker";
+import { VueDatePicker as Datepicker } from "@vuepic/vue-datepicker";
 import { timezoneList } from "../util-frontend";
 import cronstrue from "cronstrue/i18n";
 import Confirm from "../components/Confirm.vue";

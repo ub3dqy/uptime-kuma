@@ -46,7 +46,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 24
+          node-version: "24.22.2"
 
       - name: Configure Git
         env:
@@ -91,7 +91,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 24
+          node-version: "24.22.2"
 
       - name: Install dependencies
         run: node extra/release/install-deps.mjs
@@ -129,7 +129,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 24
+          node-version: "24.22.2"
 
       - name: Install opencode
         run: curl -fsSL https://opencode.ai/install | bash
@@ -168,7 +168,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 24
+          node-version: "24.22.2"
 
       - name: Install dependencies
         run: npm clean-install --no-fund
@@ -212,7 +212,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 24
+          node-version: "24.22.2"
 
       - name: Install dependencies
         run: node extra/release/install-deps.mjs
@@ -265,7 +265,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: 24
+          node-version: "24.22.2"
 
       - name: Install dependencies
         run: node extra/release/install-deps.mjs

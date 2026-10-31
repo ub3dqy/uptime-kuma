@@ -7,7 +7,7 @@ class ZohoCliq extends NotificationProvider {
 
     /**
      * Generate the message to send
-     * @param {const} status The status constant
+     * @param {number} status The status constant
      * @param {string} monitorName Name of monitor
      * @returns {string} Status message
      */
@@ -34,7 +34,7 @@ class ZohoCliq extends NotificationProvider {
     /**
      * Generate payload for notification
      * @param {object} args Method arguments
-     * @param {const} args.status The status of the monitor
+     * @param {number} args.status The status of the monitor
      * @param {string} args.monitorMessage Message to send
      * @param {string} args.monitorName Name of monitor affected
      * @param {string} args.monitorUrl URL of monitor affected

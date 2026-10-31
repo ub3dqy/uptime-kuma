@@ -2,7 +2,7 @@ const { BeanModel } = require("redbean-node/dist/bean-model");
 const { parseTimeObject, parseTimeFromTimeObject, log, SQL_DATETIME_FORMAT } = require("../../src/util");
 const { R } = require("redbean-node");
 const dayjs = require("dayjs");
-const Cron = require("croner");
+const { Cron } = require("../utils/maintenance-cron");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
 const apicache = require("../modules/apicache");
 

@@ -128,7 +128,7 @@ class AliyunSMS extends NotificationProvider {
 
     /**
      * Convert status constant to string
-     * @param {const} status The status constant
+     * @param {number} status The status constant
      * @returns {string} Status
      */
     statusToString(status) {

@@ -1,6 +1,6 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
-const sqlite3 = require("@louislam/sqlite3");
+const sqlite3 = require("../../server/utils/sqlite-driver");
 const { R } = require("redbean-node");
 const { heartbeatExportSocketHandler } = require("../../server/socket-handlers/heartbeat-export-socket-handler");
 

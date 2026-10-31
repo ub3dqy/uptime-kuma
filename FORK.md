@@ -33,9 +33,7 @@ first addition is a raw history export, not an SLA or incident-duration report.
 
 ## Install this edition
 
-Install a currently supported Node.js release **22.20 or newer**, and Git, then
-run. Node.js 20 is no longer supported by this edition after the dependency
-security updates:
+Install **Node.js 24.22.2 LTS (24.x)** and Git, then run:
 
 ```sh
 git clone --branch main https://github.com/ub3dqy/uptime-kuma.git
@@ -55,18 +53,11 @@ archives do not contain this edition's additions.
 
 ## Validation of the first addition
 
-On 31 October 2026, the nine export backend tests, translation checks and four
-Chrome browser scenarios passed. Browser checks cover a real CSV download,
-an empty period, a narrow screen and the Russian interface. JavaScript lint,
-scoped stylesheet checks and the production frontend build completed without
-errors. Existing upstream lint and build warnings remain.
-
-The export was exercised with SQLite on Windows. The dependency remediation
-also passed a focused MariaDB 12.3.2 compatibility check and all 56 fresh-schema
-migrations. Docker deployment, the complete upstream test suite and a live
-server installation have not been validated. The dependency update and the
-remaining moderate/low findings are documented in
-[the deployment review](SECURITY-BASELINE.md).
+On 31 October 2026 the dependency tree was refreshed against current stable releases.
+Both the complete tree and production-only tree report zero npm advisories.
+Backend, browser, database and TLS results and platform limits are recorded in
+[the dependency review](SECURITY-BASELINE.md). Docker images and a live server
+installation have not been qualified.
 
 ## Development and scope
 

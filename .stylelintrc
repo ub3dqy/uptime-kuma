@@ -1,7 +1,6 @@
 {
     "extends": [
-        "stylelint-config-standard",
-        "stylelint-config-prettier"
+        "stylelint-config-standard"
     ],
     "customSyntax": "postcss-html",
     "rules": {
@@ -12,6 +11,28 @@
         "shorthand-property-no-redundant-values": null,
         "color-hex-length": null,
         "declaration-block-no-redundant-longhand-properties": null,
-        "at-rule-no-unknown": null
+        "at-rule-no-unknown": null,
+        "import-notation": "string",
+        "color-function-alias-notation": null,
+        "media-feature-range-notation": "prefix",
+        "block-no-redundant-nested-style-rules": null,
+        "selector-pseudo-class-no-unknown": [
+            true,
+            {
+                "ignorePseudoClasses": [
+                    "deep"
+                ]
+            }
+        ],
+        "declaration-property-value-no-unknown": [
+            true,
+            {
+                "ignoreProperties": {
+                    "/.*/": [
+                        "/\\$/"
+                    ]
+                }
+            }
+        ]
     }
 }

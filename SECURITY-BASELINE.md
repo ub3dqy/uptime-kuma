@@ -1,91 +1,112 @@
-# Deployment status
+# Dependency baseline — 31 October 2026
 
-This fork remains a development edition. Dependency remediation does not
-establish the security of the complete application or a future deployment.
+This independent fork remains a development edition. These checks do not establish
+the security of the complete application or of a production deployment.
 
-## Dependency review on 31 October 2026
+## Locked dependency tree
 
-| Check | Before this remediation | Current locked tree |
-| --- | --- | --- |
-| `npm audit --omit=dev` | 30 packages: 2 critical, 20 high, 6 moderate, 2 low | 13 packages: 0 critical, 0 high, 11 moderate, 2 low |
-| Full `npm audit` | Not recorded on the original baseline | 40 packages: 0 critical, 0 high, 38 moderate, 2 low |
+All 157 original direct dependencies were checked against the official npm registry.
+115 declarations were updated, replaced or removed; 42 already matched the selected
+release. The resulting manifest has 155 direct packages, including explicit parser
+and compiler compatibility packages. The lockfile pins the complete resolved tree.
 
-These are registry classifications and dependency propagation counts, not
-counts of independently reproduced vulnerabilities. `--omit=dev` alone is
-insufficient for this project: DOMPurify and Vue I18n are development
-dependencies that are bundled into the production browser interface. Both
-were included in remediation and the full audit.
+| Check                     | Previously published fork | Updated locked tree |
+| ------------------------- | ------------------------- | ------------------- |
+| Production-only npm audit | 13: 11 moderate, 2 low    | 0 advisories        |
+| Complete npm audit        | 40: 38 moderate, 2 low    | 0 advisories        |
 
-Updated protobufjs, gRPC, Axios, LiquidJS, MySQL2, Nodemailer, qs, ws and tar;
-updated DOMPurify, Vue I18n and the build/test dependencies. Axios remains on
-its compatible 0.x branch. SQLite 15.1.6 and redbean-node 0.3.3 were retained;
-their affected tar, Glob and Lodash dependencies were targeted separately.
-Undici 5 consumers use an override to the tested 6.29.1 without replacing
-unrelated 7.x consumers. The existing remote Playwright monitor protocol
-version was retained; its development test runner was updated separately.
+These are registry classifications and dependency propagation counts, not counts
+of independently reproduced exploits. Browser packages declared as development
+dependencies were included: they become part of the deployed interface.
 
-**Compatibility:** this edition now requires Node.js 22.20 or newer, including
-for builds. The patched Vue I18n requires Node 22, and the build/lint tree and
-existing optional Linux tools impose higher patch-level requirements. Use a currently
-supported, security-patched runtime. Validation used Node.js 24.13.0 on
-Windows; other runtime/OS combinations were not independently validated.
-Vite 6 uses the legacy Sass API explicitly to preserve the existing styles.
+## Compatibility changes
 
-## Reproduction and validation
+- Use **Node.js 24.22.2 LTS, branch 24.x**. Runtime, build and development commands use
+  the same supported branch. Node.js 26 was also exercised during investigation, but
+  the current SSH library's optional native accelerator does not build there.
+  The selected 24.22.2 release builds that accelerator successfully. Older system
+  Node installations were not replaced as part of this work.
+- The archived SQLite driver was replaced with current better-sqlite3 13.0.3.
+  Queries run in workers so a busy database does not block monitoring timers.
+  The Knex SQLite dialect and existing database format are preserved. The package
+  bundles SQLite 3.53.4; this is not a claim that it bundles the newest SQLite engine.
+- The old TLS-table migration now rebuilds the table through public SQL operations.
+  It preserves rows, the identifier sequence and cascading ownership. SQLite's
+  defensive mode remains enabled; direct writes to sqlite_master are unnecessary.
+- Express 5 routes preserve optional badge durations and first-run setup. Axios,
+  database/network clients, MQTT 5 and the remote-browser Playwright client were
+  updated. Redis authentication failures now reject cleanly and close the socket;
+  a failing connection previously caused an unhandled rejection. A remote Playwright server must use the same 1.64.1 protocol version.
+- The sole OAuth client-credentials helper uses current Axios and preserves both
+  secret authentication methods, scope, audience, expiry and a ten-second timeout.
+  Redirects are refused and errors omit request credentials.
+- Croner 11 preserves legacy question-mark placeholders and range steps through a
+  compatibility helper. Stored expressions remain unchanged.
+- The discontinued prom-client name aliases the maintained @prometheus-io/client.
+  Application gauges and HTTP middleware share one registry.
+- Vue 3 notification and editor prereleases were replaced with stable vue-sonner
+  and prism-code-editor. Datepicker 14 options and styles were migrated. Notification
+  timeout settings, read-only push examples and editable status-page CSS remain.
+- Vite 8 uses its current configuration format and compression plugin. ESLint 10
+  uses a flat configuration retaining the existing documentation/style policy.
+  TypeScript 7.0.2 compiles the backend utility; Microsoft's TypeScript 6 API
+  compatibility package supports the current lint parser.
 
-The original notification template renderer stalled on `a<` and `text<!--`
-with `strip_html`; bounded subprocesses were terminated after the timeout.
-The patched renderer finishes and preserves the input, and ordinary HTML
-still produces the expected plain text. The bounded tar fixture verifies
-both ordinary extraction and rejection of excessive decompression. Protobuf
-identifier and valid-message controls, a local authenticated HTTP proxy,
-and local SMTP authentication, recipients, headers and templates are covered
-by regression tests. Schema-related code execution was not independently
-demonstrated through the application's gRPC monitor.
+## Version selection and limitations
 
-Focused backend tests, SQLite migrations, the production frontend build,
-JavaScript lint and the strict backend type check were run. Compatibility
-with the updated compiler required a Popper type-definition update and
-synthetic default-import typing; CommonJS emit semantics were preserved.
-The browser scenarios cover CSV, empty history,
-range validation, Russian text, narrow screens and sanitized descriptions.
-Local STARTTLS and SMTPS controls retain certificate validation and generate
-DKIM signatures. Portable MariaDB 12.3.2 passed all 56 fresh-schema migrations,
-production monitor queries, Unicode, password overrides/refusal, compressed
-queries and the CSV size query. Its official archive checksum was verified.
+The npm latest tag is not always the compatible stable release: vuedraggable's tag
+points to Vue 2, so its Vue 3 release 4.1.0 is retained. Small packages with no newer
+release also remain, including the application's ping fork and legacy password-hash
+reader. Their age alone is not evidence of a vulnerability, and zero advisories is
+not proof that they have no bugs. Dependencies of current packages still include
+some deprecated helpers, notably core-js 2 through the image cropper, lodash.get,
+event-to-promise and whatwg-encoding. They have no reported npm advisory in this
+locked tree; they were not silently relabelled as maintained components.
 
-The full Docker/container suite, source compilation of SQLite, physical
-production infrastructure and an upgrade of a real customer database have
-not been validated. Existing lint/build warnings remain. No production
-deployment or GitHub Actions run was enabled.
+Current Glob and Minimatch are selected only after their remaining consumers were
+checked for the named/synchronous APIs they use. RedBean model loading, linting and
+archive glob traversal were exercised. Removed legacy callable consumers are not
+forced onto incompatible APIs merely to change the audit count.
 
-## Remaining findings
+## Validation
 
-The 13 production-tree classifications originate in the SQLite installation
-toolchain and MQTT's command-line help dependency. The remaining full-tree
-classifications also include local linting, archive/container tooling and
-their old Glob/Minimatch dependencies. They remain open. The identified
-installer and help code uses local paths/patterns; a route from ordinary
-public web requests to those particular vulnerable operations was not found
-in this focused review. This is not proof that every possible route is safe.
-Only trusted installation sources, repository contents and local CLI inputs
-should be used while this work remains open.
+Local checks cover database parameters, Unicode/BLOB data, rollback, locking without
+blocking timers, first-run SQLite upgrades, all 56 fresh SQLite migrations, and
+reopening a synthetic database created by the previous SQLite 3.41.1 driver.
+The retained records and integrity check survive that upgrade.
 
-Do not force the latest Glob/Minimatch globally: the legacy installer and
-lint consumers use callable/callback APIs removed by later major versions.
-Replacing those consumers requires a separate compatibility change and real
-source-build checks. The development servers are not deployment servers.
+Portable MariaDB 12.3.2 passed all 56 fresh-schema migrations and production monitor
+queries, Unicode, password overrides/refusal, compression and the CSV size query.
+Isolated Redis 8 and PostgreSQL 18 containers passed production monitor queries
+and authentication/error controls. Loopback peers exercise MQTT, gRPC, TCP, WebSocket, SSH/SFTP and SMTP. STARTTLS and
+SMTPS retain certificate validation against an explicit test CA and produce DKIM
+signatures. OAuth, shared metrics, token limiting, parser/decompression regressions,
+CSV authorization and formula protection have focused controls.
 
-Primary references:
+Eight Chrome scenarios cover real CSV download, empty history, UTC validation,
+Russian text, narrow screens, sanitized descriptions, charts/dropdowns, editable
+status-page CSS/title, read-only push code, date pickers and authenticated metrics.
+The production frontend build, strict utility type check and lint checks are included.
+Existing warnings remain; checks were not weakened to hide runtime incompatibilities.
 
-- [protobufjs schema code generation](https://github.com/advisories/GHSA-xq3m-2v4x-88gg)
-- [tar decompression limits](https://github.com/advisories/GHSA-23hp-3jrh-7fpw)
-- [LiquidJS infinite loop](https://github.com/advisories/GHSA-m7fp-h3p4-hr49)
-- [DOMPurify update](https://github.com/cure53/DOMPurify/security/advisories/GHSA-cg2g-xh64-v4q7)
-- [Vue I18n engine requirement](https://github.com/intlify/vue-i18n/blob/v11.4.16/packages/vue-i18n/package.json)
-- [Vite Sass compatibility](https://v6.vite.dev/guide/migration.html#sass-now-uses-modern-api-by-default)
+The complete Docker/container suite did not complete: its required MariaDB/MySQL
+images did not start in this environment. The portable MariaDB checks above are
+separate evidence. Linux/macOS images, real customer data and external notification
+vendors or database services requiring separate infrastructure/accounts are not
+qualified by local fixtures. No production deployment or Actions run was enabled.
+Build this fork's container base locally before its main image; upstream prebuilt
+images do not contain the updated runtime or this fork's additions.
 
-The CSV endpoint checks authentication and monitor ownership, bounds the date
-range, row count and output size, limits concurrent exports per account, and
-neutralizes formula-like text. Those controls apply to this feature; they do
-not establish the security of the entire application.
+## Primary references
+
+- [Node release index](https://nodejs.org/dist/index.json)
+- [SQLite driver](https://github.com/WiseLibs/better-sqlite3)
+- [Express 5 migration](https://expressjs.com/en/guide/migrating-5.html)
+- [Croner migration](https://croner.56k.guru/migration/)
+- [Maintained Prometheus client](https://github.com/prometheus/client_js)
+- [TypeScript compiler/API compatibility](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)
+- [Vite migration](https://vite.dev/guide/migration)
+- [Datepicker migration](https://vue3datepicker.com/migration/from-v11)
+
+The audit is a dated baseline. Recheck the locked tree before deploying and before
+subsequent updates; newly disclosed advisories can change the result.

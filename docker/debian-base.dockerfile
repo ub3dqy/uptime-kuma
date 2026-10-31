@@ -1,5 +1,5 @@
 # Download Apprise deb package
-FROM node:22-bookworm-slim AS download-apprise
+FROM node:24.22.2-bookworm-slim AS download-apprise
 WORKDIR /app
 COPY ./extra/download-apprise.mjs ./download-apprise.mjs
 RUN apt update && \
@@ -9,7 +9,7 @@ RUN apt update && \
 
 # Base Image (Slim)
 # If the image changed, the second stage image should be changed too
-FROM node:22-bookworm-slim AS base2-slim
+FROM node:24.22.2-bookworm-slim AS base2-slim
 ARG TARGETPLATFORM
 
 # Specify --no-install-recommends to skip unused dependencies, make the base much smaller!
@@ -66,9 +66,8 @@ RUN curl -fsSL https://letsencrypt.org/certs/gen-y/root-ye.pem -o /usr/local/sha
 
 # Full Base Image
 # MariaDB, Chromium and fonts
-# Make sure to reuse the slim image here. Uncomment the above line if you want to build it from scratch.
-# FROM base2-slim AS base2
-FROM louislam/uptime-kuma:base2-slim AS base2
+# Inherit the runtime built above, including this fork's Node version.
+FROM base2-slim AS base2
 ENV UPTIME_KUMA_ENABLE_EMBEDDED_MARIADB=1
 RUN apt update && \
     apt --yes --no-install-recommends install chromium fonts-indic fonts-noto fonts-noto-cjk mariadb-server && \

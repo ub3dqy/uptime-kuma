@@ -177,7 +177,7 @@
 
 <script>
 import axios from "axios";
-import { useToast } from "vue-toastification";
+import { useToast } from "../notifications";
 import { sleep } from "../util.ts";
 const toast = useToast();
 

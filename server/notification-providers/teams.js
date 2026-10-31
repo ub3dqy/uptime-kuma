@@ -8,7 +8,7 @@ class Teams extends NotificationProvider {
 
     /**
      * Generate the message to send
-     * @param {const} status The status constant
+     * @param {number} status The status constant
      * @param {string} monitorName Name of monitor
      * @param {boolean} withStatusSymbol If the status should be prepended as symbol
      * @returns {string} Status message
@@ -24,7 +24,7 @@ class Teams extends NotificationProvider {
 
     /**
      * Select the style to use based on status
-     * @param {const} status The status constant
+     * @param {number} status The status constant
      * @returns {string} Selected style for adaptive cards
      */
     _getStyle = (status) => {

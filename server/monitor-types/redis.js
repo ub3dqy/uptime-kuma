@@ -19,39 +19,22 @@ class RedisMonitorType extends MonitorType {
      * @param {boolean} rejectUnauthorized If false, allows unverified server certificates.
      * @returns {Promise<any>} Response from redis server
      */
-    redisPingAsync(dsn, rejectUnauthorized) {
-        return new Promise((resolve, reject) => {
-            const client = redis.createClient({
-                url: dsn,
-                socket: {
-                    rejectUnauthorized,
-                },
-            });
-            client.on("error", (err) => {
-                if (client.isOpen) {
-                    client.disconnect();
-                }
-                reject(err);
-            });
-            client.connect().then(() => {
-                if (!client.isOpen) {
-                    client.emit("error", new Error("connection isn't open"));
-                }
-                client
-                    .ping()
-                    .then((res, err) => {
-                        if (client.isOpen) {
-                            client.disconnect();
-                        }
-                        if (err) {
-                            reject(err);
-                        } else {
-                            resolve(res);
-                        }
-                    })
-                    .catch((error) => reject(error));
-            });
+    async redisPingAsync(dsn, rejectUnauthorized) {
+        const client = redis.createClient({
+            url: dsn,
+            socket: { rejectUnauthorized, reconnectStrategy: false, connectTimeout: 5000 },
         });
+        // The awaited connect/ping promises report errors to the monitor. Redis
+        // also emits an error event, which must have a listener.
+        client.on("error", () => {});
+        try {
+            await client.connect();
+            return await client.ping();
+        } finally {
+            if (client.isOpen) {
+                client.destroy();
+            }
+        }
     }
 }
 

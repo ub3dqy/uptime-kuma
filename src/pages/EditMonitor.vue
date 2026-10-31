@@ -3263,7 +3263,7 @@
 
 <script>
 import VueMultiselect from "vue-multiselect";
-import { useToast } from "vue-toastification";
+import { useToast } from "../notifications";
 import ActionSelect from "../components/ActionSelect.vue";
 import CopyableInput from "../components/CopyableInput.vue";
 import CreateGroupDialog from "../components/CreateGroupDialog.vue";

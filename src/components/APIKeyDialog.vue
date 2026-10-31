@@ -23,12 +23,13 @@
                                 <div class="col-6">
                                     <Datepicker
                                         v-model="key.expires"
+                                        :week-start="1"
                                         :dark="$root.isDark"
-                                        :monthChangeOnScroll="false"
+                                        :config="{ monthChangeOnScroll: false }"
                                         :minDate="minDate"
-                                        format="yyyy-MM-dd HH:mm"
+                                        :formats="{ input: 'yyyy-MM-dd HH:mm' }"
                                         modelType="yyyy-MM-dd HH:mm:ss"
-                                        :required="!noExpire"
+                                        :input-attrs="{ required: !noExpire }"
                                         :disabled="noExpire"
                                     />
                                 </div>
@@ -87,7 +88,7 @@
 <script lang="ts">
 import { Modal } from "bootstrap";
 import dayjs from "dayjs";
-import Datepicker from "@vuepic/vue-datepicker";
+import { VueDatePicker as Datepicker } from "@vuepic/vue-datepicker";
 import CopyableInput from "./CopyableInput.vue";
 
 export default {

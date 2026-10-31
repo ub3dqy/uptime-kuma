@@ -41,7 +41,7 @@
             </p>
 
             <p style="margin-top: 8px">
-                <a :href="telegramGetUpdatesURL('withToken')" target="_blank" style="word-break: break-word">
+                <a :href="telegramGetUpdatesURL('withToken')" target="_blank" style="overflow-wrap: anywhere">
                     {{ telegramGetUpdatesURL("masked") }}
                 </a>
             </p>

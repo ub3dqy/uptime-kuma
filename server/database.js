@@ -300,7 +300,7 @@ class Database {
             }
 
             const Dialect = require("knex/lib/dialects/sqlite3/index.js");
-            Dialect.prototype._driver = () => require("@louislam/sqlite3");
+            Dialect.prototype._driver = () => require("./utils/sqlite-driver");
 
             // SQLite is actually multiple connections for WAL mode, so we can set it to a higher number.
             // See: https://github.com/knex/knex/issues/3176#issuecomment-3389054899
@@ -762,8 +762,29 @@ class Database {
                 return statement !== "";
             });
 
-        for (let statement of statements) {
-            await R.exec(statement);
+        // Transactions and PRAGMAs belong to a connection, even with the optional
+        // multi-connection SQLite pool. Keep the whole legacy file on one lease.
+        const connection = await R.knex.client.acquireConnection();
+        let foreignKeys;
+        try {
+            [{ foreign_keys: foreignKeys }] = await R.knex.raw("PRAGMA foreign_keys").connection(connection);
+            for (const statement of statements) {
+                await R.knex.raw(statement).connection(connection);
+            }
+        } catch (error) {
+            await R.knex
+                .raw("ROLLBACK")
+                .connection(connection)
+                .catch(() => {});
+            throw error;
+        } finally {
+            try {
+                if (foreignKeys !== undefined) {
+                    await R.knex.raw("PRAGMA foreign_keys = " + (foreignKeys ? "ON" : "OFF")).connection(connection);
+                }
+            } finally {
+                await R.knex.client.releaseConnection(connection);
+            }
         }
     }
 

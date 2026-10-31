@@ -217,7 +217,7 @@ router.get("/api/badge/:id/status", cache("5 minutes"), async (request, response
     }
 });
 
-router.get("/api/badge/:id/uptime/:duration?", cache("5 minutes"), async (request, response) => {
+router.get("/api/badge/:id/uptime{/:duration}", cache("5 minutes"), async (request, response) => {
     allowAllOrigin(response);
 
     const {
@@ -281,7 +281,7 @@ router.get("/api/badge/:id/uptime/:duration?", cache("5 minutes"), async (reques
     }
 });
 
-router.get("/api/badge/:id/ping/:duration?", cache("5 minutes"), async (request, response) => {
+router.get("/api/badge/:id/ping{/:duration}", cache("5 minutes"), async (request, response) => {
     allowAllOrigin(response);
 
     const {
@@ -344,7 +344,7 @@ router.get("/api/badge/:id/ping/:duration?", cache("5 minutes"), async (request,
     }
 });
 
-router.get("/api/badge/:id/avg-response/:duration?", cache("5 minutes"), async (request, response) => {
+router.get("/api/badge/:id/avg-response{/:duration}", cache("5 minutes"), async (request, response) => {
     allowAllOrigin(response);
 
     const {

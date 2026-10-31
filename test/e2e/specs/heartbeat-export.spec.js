@@ -22,6 +22,7 @@ async function createMonitor(page, baseURL) {
 test.describe("Retained history CSV", () => {
     test.beforeAll(async ({ browser, baseURL }) => {
         const page = await browser.newPage({ locale: "en-US" });
+        page.on("pageerror", (error) => console.error("Browser startup:", error.message));
         await page.goto(baseURL);
         await page.waitForSelector("form, [data-testid='monitor-list']");
         if (await page.getByText("SQLite", { exact: true }).isVisible()) {
@@ -123,5 +124,74 @@ test.describe("Retained history CSV", () => {
         await expect(
             page.locator("header .dropdown-menu").getByRole("link", { name: "Settings", exact: true })
         ).toBeVisible();
+    });
+
+    test("the maintained editor saves status-page CSS and editable titles", async ({ page }) => {
+        const errors = [];
+        page.on("pageerror", (error) => errors.push(error.message));
+        await page.goto("./add-status-page");
+        await login(page);
+        await page.getByTestId("name-input").fill("Dependency upgrade");
+        await page.getByTestId("slug-input").fill("dependency-upgrade");
+        await page.getByTestId("submit-button").click();
+        await page.waitForURL(/\/status\/dependency-upgrade(?:\?.*)?$/);
+        const edit = page.getByTestId("edit-button");
+        if (await edit.isVisible()) {
+            await edit.click();
+        }
+        const editor = page.getByTestId("custom-css-input").locator("textarea");
+        await editor.fill("body { --upgrade-proof: 42; }");
+        await page.locator("h1 [contenteditable=true]").fill("Updated title");
+        await page.getByTestId("save-button").click();
+        await expect(page.getByRole("heading", { name: "Updated title", exact: true })).toBeVisible();
+        await expect
+            .poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--upgrade-proof").trim()))
+            .toBe("42");
+        await page.getByTestId("edit-button").click();
+        await expect(editor).toHaveValue("body { --upgrade-proof: 42; }");
+        expect(errors).toEqual([]);
+    });
+
+    test("push examples remain highlighted and read only", async ({ page }) => {
+        await page.goto("./add");
+        await login(page);
+        await page.getByTestId("monitor-type-select").selectOption("push");
+        await page.getByTestId("friendly-name-input").fill("Push editor check");
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/dashboard/*");
+        if (!(await page.locator("#push-current-example").isVisible())) {
+            await page.getByText("How to use Push monitor? (View Code)", { exact: true }).click();
+        }
+        await page.locator("#push-current-example").selectOption("javascript-fetch");
+        const editor = page.locator(".code-editor textarea");
+        await expect(editor).toHaveAttribute("readonly", "");
+        await expect(editor).toHaveValue(/fetch/);
+        await expect(page.locator(".code-editor .token").first()).toBeAttached();
+    });
+
+    test("current date pickers open and metrics keep authentication", async ({ page, request }) => {
+        const errors = [];
+        page.on("pageerror", (error) => errors.push(error.message));
+        await page.goto("./add-maintenance");
+        await login(page);
+        await expect(page.locator('input[type="datetime-local"]').first()).not.toHaveValue("");
+        await page.locator("#strategy").selectOption("recurring-interval");
+        await page.locator(".dp--input").click();
+        await expect(page.locator(".dp--menu")).toBeVisible();
+        await page.keyboard.press("Escape");
+        await page.goto("./settings/api-keys");
+        await page.getByRole("button", { name: "Add API Key", exact: true }).click();
+        const modal = page.locator(".modal.show");
+        await modal.locator(".dp--input").click();
+        await expect(modal.locator(".dp--menu")).toBeVisible();
+        expect((await request.get("/metrics")).status()).toBe(401);
+        const response = await request.get("/metrics", {
+            headers: { Authorization: "Basic " + Buffer.from("admin:admin123").toString("base64") },
+        });
+        expect(response.status()).toBe(200);
+        const metrics = await response.text();
+        expect(metrics).toContain("monitor_status");
+        expect(metrics).toContain("process_cpu_user_seconds_total");
+        expect(errors).toEqual([]);
     });
 });

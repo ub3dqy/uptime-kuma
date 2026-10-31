@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
-import { useToast } from "vue-toastification";
-import jwtDecode from "jwt-decode";
+import { useToast } from "../notifications";
+import { jwtDecode } from "jwt-decode";
 import Favico from "favico.js";
 import dayjs from "dayjs";
 import mitt from "mitt";

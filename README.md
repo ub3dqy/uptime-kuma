@@ -2,7 +2,7 @@
 > Adds an authenticated CSV export of retained checks, with UTC ranges and spreadsheet formula protection.
 > [Fork documentation](FORK.md) · [Описание на русском](FORK.ru.md).
 > Use `npm run setup` to build this edition from source. The upstream documentation below is preserved for reference.
-> This edition requires a supported Node.js release **22.20 or newer**, including for builds.
+> This edition requires a supported Node.js release **24.22.2 LTS (24.x)**, including for builds.
 
 <div align="center" width="100%">
     <img src="./public/icon.svg" width="128" alt="Uptime Kuma Logo" />
@@ -80,7 +80,7 @@ Requirements:
   - ✅ Windows 10 (x64), Windows Server 2012 R2 (x64) or higher
   - ❌ FreeBSD / OpenBSD / NetBSD
   - ❌ Replit / Heroku
-- [Node.js](https://nodejs.org/en/download/) >= 22.20 (this edition)
+- [Node.js](https://nodejs.org/en/download/) 24.22.2 LTS (24.x, this edition)
 - [Git](https://git-scm.com/downloads)
 - [pm2](https://pm2.keymetrics.io/) - For running Uptime Kuma in the background
 

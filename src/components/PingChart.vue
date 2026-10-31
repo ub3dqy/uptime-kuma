@@ -23,7 +23,7 @@
             </ul>
         </div>
         <div class="chart-wrapper" :class="{ loading: loading }">
-            <Line :data="chartData" :options="chartOptions" />
+            <LineChart :data="chartData" :options="chartOptions" />
         </div>
     </div>
 </template>
@@ -43,7 +43,7 @@ import {
     Legend,
 } from "chart.js";
 import "chartjs-adapter-dayjs-4";
-import { Line } from "vue-chartjs";
+import { Line as LineChart } from "vue-chartjs";
 import { UP, DOWN, PENDING, MAINTENANCE } from "../util.ts";
 
 Chart.register(
@@ -60,7 +60,7 @@ Chart.register(
 );
 
 export default {
-    components: { Line },
+    components: { LineChart },
     props: {
         /** ID of monitor */
         monitorId: {

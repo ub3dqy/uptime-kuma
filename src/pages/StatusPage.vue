@@ -205,13 +205,13 @@
                 <!-- Custom CSS -->
                 <div class="my-3">
                     <div class="mb-1">{{ $t("Custom CSS") }}</div>
-                    <prism-editor
+                    <code-editor
                         v-model="config.customCSS"
                         class="css-editor"
                         data-testid="custom-css-input"
-                        :highlight="highlighter"
+                        language="css"
                         line-numbers
-                    ></prism-editor>
+                    ></code-editor>
                 </div>
 
                 <div class="danger-zone">
@@ -606,15 +606,9 @@ import axios from "axios";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import Favico from "favico.js";
-// import highlighting library (you can use any library you want just return html string)
-import { highlight, languages } from "prismjs/components/prism-core";
-import "prismjs/components/prism-css";
-import "prismjs/themes/prism-tomorrow.css"; // import syntax highlighting styles
 import ImageCropUpload from "vue-image-crop-upload";
-// import Prism Editor
-import { PrismEditor } from "vue-prism-editor";
-import "vue-prism-editor/dist/prismeditor.min.css"; // import the styles somewhere
-import { useToast } from "vue-toastification";
+import CodeEditor from "../components/CodeEditor.vue";
+import { useToast } from "../notifications";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import Confirm from "../components/Confirm.vue";
@@ -652,7 +646,7 @@ export default {
         PublicGroupList,
         ImageCropUpload,
         Confirm,
-        PrismEditor,
+        CodeEditor,
         MaintenanceTime,
         Tag,
         VueMultiselect,
@@ -1057,15 +1051,6 @@ export default {
             } else {
                 return axios.get("/api/status-page/" + this.slug);
             }
-        },
-
-        /**
-         * Provide syntax highlighting for CSS
-         * @param {string} code Text to highlight
-         * @returns {string} Highlighted CSS
-         */
-        highlighter(code) {
-            return highlight(code, languages.css);
         },
 
         /**

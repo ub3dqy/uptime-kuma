@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=louislam/uptime-kuma:base2
+ARG BASE_IMAGE=uptime-kuma-base24:local
 
 ############################################
 # Build in Golang
@@ -10,7 +10,9 @@ FROM louislam/uptime-kuma:builder-go AS build_healthcheck
 ############################################
 # Build in Node.js
 ############################################
-FROM louislam/uptime-kuma:base2 AS build
+FROM node:24.22.2-bookworm-slim AS build
+RUN apt-get update && apt-get install --yes --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/* && mkdir /app && chown node:node /app
 USER node
 WORKDIR /app
 
@@ -29,7 +31,7 @@ RUN mkdir ./data
 FROM $BASE_IMAGE AS release
 WORKDIR /app
 
-LABEL org.opencontainers.image.source="https://github.com/louislam/uptime-kuma"
+LABEL org.opencontainers.image.source="https://github.com/ub3dqy/uptime-kuma"
 
 ENV UPTIME_KUMA_IS_CONTAINER=1
 

@@ -1,7 +1,6 @@
 import dayjs from "dayjs";
 import { getTimeZones } from "@vvo/tzdb";
 import { localeDirection, currentLocale } from "./i18n";
-import { POSITION } from "vue-toastification";
 
 /**
  * Returns the offset from UTC in hours for the current locale.
@@ -125,26 +124,6 @@ export function colorOptions(self) {
         { name: self.$t("Purple"), color: "#7C3AED" },
         { name: self.$t("Pink"), color: "#DB2777" },
     ];
-}
-
-/**
- * Loads the toast timeout settings from storage.
- * @returns {object} The toast plugin options object.
- */
-export function loadToastSettings() {
-    return {
-        position: POSITION.BOTTOM_RIGHT,
-        containerClassName: "toast-container mb-5",
-        showCloseButtonOnHover: true,
-
-        filterBeforeCreate: (toast, toasts) => {
-            if (toast.timeout === 0) {
-                return false;
-            } else {
-                return toast;
-            }
-        },
-    };
 }
 
 /**

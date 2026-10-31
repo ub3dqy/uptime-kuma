@@ -193,13 +193,13 @@
                             </optgroup>
                         </select>
 
-                        <prism-editor
+                        <code-editor
                             v-model="pushMonitor.code"
                             class="css-editor mt-3"
-                            :highlight="pushExampleHighlighter"
+                            language="javascript"
                             line-numbers
                             readonly
-                        ></prism-editor>
+                        ></code-editor>
                     </div>
                 </transition>
             </div>
@@ -441,7 +441,7 @@
 
 <script>
 import { defineAsyncComponent } from "vue";
-import { useToast } from "vue-toastification";
+import { useToast } from "../notifications";
 const toast = useToast();
 import Confirm from "../components/Confirm.vue";
 import HeartbeatBar from "../components/HeartbeatBar.vue";
@@ -454,16 +454,10 @@ const PingChart = defineAsyncComponent(() => import("../components/PingChart.vue
 import Tag from "../components/Tag.vue";
 import CertificateInfo from "../components/CertificateInfo.vue";
 import { getMonitorRelativeURL } from "../util.ts";
-import { URL } from "whatwg-url";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { getResBaseURL, timeDurationFormatter } from "../util-frontend";
-import { highlight, languages } from "prismjs/components/prism-core";
-import "prismjs/components/prism-clike";
-import "prismjs/components/prism-javascript";
-import "prismjs/components/prism-css";
-import { PrismEditor } from "vue-prism-editor";
-import "vue-prism-editor/dist/prismeditor.min.css";
+import CodeEditor from "../components/CodeEditor.vue";
 import ScreenshotDialog from "../components/ScreenshotDialog.vue";
 import HeartbeatExport from "../components/HeartbeatExport.vue";
 
@@ -479,7 +473,7 @@ export default {
         PingChart,
         Tag,
         CertificateInfo,
-        PrismEditor,
+        CodeEditor,
         ScreenshotDialog,
         HeartbeatExport,
     },
@@ -846,15 +840,6 @@ export default {
                     this.importantHeartBeatListLength += 1;
                 }
             }
-        },
-
-        /**
-         * Highlight the example code
-         * @param {string} code Code
-         * @returns {string} Highlighted code
-         */
-        pushExampleHighlighter(code) {
-            return highlight(code, languages.js);
         },
 
         loadPushExample() {

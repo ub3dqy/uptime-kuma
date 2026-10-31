@@ -19,7 +19,7 @@ const nodeVersion = process.versions.node;
 
 // Get the required Node.js version from package.json
 const requiredNodeVersions = require("../package.json").engines.node;
-const bannedNodeVersions = " < 18 || 20.0.* || 20.1.* || 20.2.* || 20.3.* ";
+
 console.log(`Your Node.js version: ${nodeVersion}`);
 
 const semver = require("semver");
@@ -28,21 +28,13 @@ const requiredNodeVersionsComma = requiredNodeVersions
     .map((version) => version.trim())
     .join(", ");
 
-// Exit Uptime Kuma immediately if the Node.js version is banned
-if (semver.satisfies(nodeVersion, bannedNodeVersions)) {
+// Stop before loading application modules on an unsupported runtime.
+if (!semver.satisfies(nodeVersion, requiredNodeVersions)) {
     console.error(
         "\x1b[31m%s\x1b[0m",
         `Error: Your Node.js version: ${nodeVersion} is not supported, please upgrade your Node.js to ${requiredNodeVersionsComma}.`
     );
     process.exit(-1);
-}
-
-// Warning if the Node.js version is not in the support list, but it maybe still works
-if (!semver.satisfies(nodeVersion, requiredNodeVersions)) {
-    console.warn(
-        "\x1b[31m%s\x1b[0m",
-        `Warning: Your Node.js version: ${nodeVersion} is not officially supported, please upgrade your Node.js to ${requiredNodeVersionsComma}.`
-    );
 }
 
 const args = require("args-parser")(process.argv);
@@ -378,7 +370,7 @@ let needSetup = false;
     app.use(statusPageRouter);
 
     // Universal Route Handler, must be at the end of all express routes.
-    app.get("*", async (_request, response) => {
+    app.get("/{*splat}", async (_request, response) => {
         if (_request.originalUrl.startsWith("/upload/")) {
             response.status(404).send("File not found.");
         } else {

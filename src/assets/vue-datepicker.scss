@@ -3,7 +3,7 @@
 
 // Must use #{ }
 // Remark: https://stackoverflow.com/questions/50202991/unable-to-set-scss-variable-to-css-variable
-.dp__theme_dark {
+.dp--theme-dark {
     --dp-background-color: #{$dark-bg2};
     --dp-text-color: #{$dark-font-color};
     --dp-hover-color: #484848;
@@ -25,15 +25,15 @@
     --dp-highlight-color: rgba(0, 92, 178, 0.2);
 }
 
-.dp__input {
+.dp--input {
     border-radius: $border-radius;
 }
 
 // Fix: Full width of text input when using "inline textInput inlineWithInput" mode
-.dp__main > div[aria-label="Datepicker input"] {
+.dp--main > div[aria-label="Datepicker input"] {
     width: 100%;
 }
 
-.dp__main > div[aria-label="Datepicker menu"]:nth-child(2) {
+.dp--main > div[aria-label="Datepicker menu"]:nth-child(2) {
     margin-top: 20px;
 }

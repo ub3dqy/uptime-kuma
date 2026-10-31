@@ -299,11 +299,11 @@ class SetupDatabase {
                 })
             );
 
-            app.get("*", async (_request, response) => {
+            app.get("/{*splat}", async (_request, response) => {
                 response.send(this.server.indexHTML);
             });
 
-            app.options("*", async (_request, response) => {
+            app.options("/{*splat}", async (_request, response) => {
                 allowDevAllOrigin(response);
                 response.end();
             });

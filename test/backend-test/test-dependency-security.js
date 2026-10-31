@@ -15,7 +15,7 @@ const { createRequire } = require("node:module");
 
 describe("Security dependency regressions", () => {
     test("release HTTP client preserves requests through an authenticated proxy", async (context) => {
-        const consumer = createRequire(require.resolve("@actions/github"));
+        const consumer = createRequire(path.join(__dirname, "../../node_modules/@actions/github/package.json"));
         const { fetch, ProxyAgent } = consumer("undici");
         const sockets = new Set();
         const track = (socket) => {
@@ -60,7 +60,7 @@ describe("Security dependency regressions", () => {
         const response = await fetch(`http://127.0.0.1:${upstream.address().port}/`, { dispatcher: agent });
         assert.equal(await response.text(), "local upstream");
         assert.equal(authorization, "Basic dGVzdDp0ZXN0");
-        assert.equal(typeof require("@actions/github").getOctokit, "function");
+        assert.equal(typeof (await import("@actions/github")).getOctokit, "function");
     });
 
     test("notification templates finish on incomplete HTML and preserve ordinary text", async () => {
