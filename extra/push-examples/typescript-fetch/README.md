@@ -1,10 +1,13 @@
 # How to run
 
-Node.js (ts-node)
+Node.js 24.22.2 LTS (24.x)
 
 ```bash
-ts-node index.ts
+node index.ts
 ```
+
+Node runs this example directly; no package installation is needed. Its built-in
+TypeScript support removes type annotations without checking types.
 
 Deno
 

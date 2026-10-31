@@ -39,7 +39,7 @@
         "vite-preview-dist": "vite preview --host --config ./config/vite.config.mjs",
         "build-docker-base": "docker build -f docker/debian-base.dockerfile -t uptime-kuma-base24:local --target base2 .",
         "build-docker-base-slim": "docker build -f docker/debian-base.dockerfile -t uptime-kuma-base24-slim:local --target base2-slim .",
-        "build-docker-builder-go": "docker buildx build -f docker/builder-go.dockerfile --platform linux/amd64,linux/arm64,linux/arm/v7 -t louislam/uptime-kuma:builder-go . --push",
+        "build-docker-builder-go": "docker build -f docker/builder-go.dockerfile -t uptime-kuma-builder-go:local .",
         "build-docker-nightly-local": "npm run build && docker build -f docker/dockerfile -t louislam/uptime-kuma:nightly2 --target nightly .",
         "build-docker-pr-test": "docker buildx build -f docker/dockerfile --platform linux/amd64,linux/arm64 -t louislam/uptime-kuma:pr-test2 --target pr-test2 . --push",
         "upload-artifacts": "node extra/release/upload-artifacts.mjs",

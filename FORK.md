@@ -51,13 +51,26 @@ up before upgrades. Restore upgrades on a copy before changing live data.
 The fork's `setup` builds its frontend from source. Upstream prebuilt frontend
 archives do not contain this edition's additions.
 
+To use Docker, build this edition's base and release image from the same checkout
+after `setup`:
+
+```sh
+npm run build-docker-base
+docker build -f docker/dockerfile --target release -t ub3dqy/uptime-kuma:local .
+docker run -d --name uptime-kuma -p 127.0.0.1:3001:3001 -v uptime-kuma-data:/app/data ub3dqy/uptime-kuma:local
+```
+
+This builds locally. Application data is kept in the separate `uptime-kuma-data`
+volume; back it up before upgrading.
+
 ## Validation of the first addition
 
 On 31 October 2026 the dependency tree was refreshed against current stable releases.
 Both the complete tree and production-only tree report zero npm advisories.
 Backend, browser, database and TLS results and platform limits are recorded in
-[the dependency review](SECURITY-BASELINE.md). Docker images and a live server
-installation have not been qualified.
+[the dependency review](SECURITY-BASELINE.md). Clean installation on Windows and
+the Linux/amd64 Docker release have passed local acceptance. A live server
+installation has not been qualified.
 
 ## Development and scope
 

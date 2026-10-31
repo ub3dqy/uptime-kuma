@@ -9,6 +9,9 @@ All 157 original direct dependencies were checked against the official npm regis
 115 declarations were updated, replaced or removed; 42 already matched the selected
 release. The resulting manifest has 155 direct packages, including explicit parser
 and compiler compatibility packages. The lockfile pins the complete resolved tree.
+All nested package manifests were inspected too. The TypeScript push example now
+runs directly on Node 24; its four old development dependencies are unnecessary
+and were removed. The other nested manifests declare no additional packages.
 
 | Check                     | Previously published fork | Updated locked tree |
 | ------------------------- | ------------------------- | ------------------- |
@@ -26,6 +29,9 @@ dependencies were included: they become part of the deployed interface.
   the current SSH library's optional native accelerator does not build there.
   The selected 24.22.2 release builds that accelerator successfully. Older system
   Node installations were not replaced as part of this work.
+- Docker's main, push-helper and auxiliary stages use the selected Node runtime.
+  The healthcheck is built from source with Go 1.27.3; the old Debian Buster/Node 18
+  builder and prebuilt upstream healthcheck image are no longer required.
 - The archived SQLite driver was replaced with current better-sqlite3 13.0.3.
   Queries run in workers so a busy database does not block monitoring timers.
   The Knex SQLite dialect and existing database format are preserved. The package
@@ -89,9 +95,17 @@ status-page CSS/title, read-only push code, date pickers and authenticated metri
 The production frontend build, strict utility type check and lint checks are included.
 Existing warnings remain; checks were not weakened to hide runtime incompatibilities.
 
+A clean Windows installation through `npm run setup` passed. The Linux/amd64 full
+container base and release image built locally, including production dependencies.
+The image reports Node 24.22.2 and SQLite 3.53.4, loads the native CPU/SSH modules,
+and passes the same eight browser scenarios against a fresh isolated SQLite database.
+The newly compiled healthcheck also passes. The TypeScript push example executes
+on Node 24 without installing a compiler or making an external test request.
+
 The complete Docker/container suite did not complete: its required MariaDB/MySQL
-images did not start in this environment. The portable MariaDB checks above are
-separate evidence. Linux/macOS images, real customer data and external notification
+images did not start in this environment. The portable MariaDB checks and the
+Linux/amd64 release acceptance above are separate evidence. Other architectures,
+macOS, real customer data and external notification
 vendors or database services requiring separate infrastructure/accounts are not
 qualified by local fixtures. No production deployment or Actions run was enabled.
 Build this fork's container base locally before its main image; upstream prebuilt
@@ -100,6 +114,8 @@ images do not contain the updated runtime or this fork's additions.
 ## Primary references
 
 - [Node release index](https://nodejs.org/dist/index.json)
+- [Native TypeScript execution](https://nodejs.org/docs/latest-v24.x/api/typescript.html)
+- [Current Go releases](https://go.dev/dl/)
 - [SQLite driver](https://github.com/WiseLibs/better-sqlite3)
 - [Express 5 migration](https://expressjs.com/en/guide/migrating-5.html)
 - [Croner migration](https://croner.56k.guru/migration/)

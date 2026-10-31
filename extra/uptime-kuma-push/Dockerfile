@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS build
+FROM node:24.22.2-bookworm-slim AS build
 RUN useradd --create-home kuma
 USER kuma
 WORKDIR /home/kuma
