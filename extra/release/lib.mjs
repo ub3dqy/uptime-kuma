@@ -2,7 +2,7 @@ import "dotenv/config";
 import * as childProcess from "child_process";
 import semver from "semver";
 import fs from "fs";
-import tar from "tar";
+import * as tar from "tar";
 
 // Support both the legacy RELEASE_DRY_RUN=1 format and DRY_RUN=true used by GitHub Actions workflows
 export const dryRun = process.env.RELEASE_DRY_RUN === "1" || process.env.DRY_RUN === "true";

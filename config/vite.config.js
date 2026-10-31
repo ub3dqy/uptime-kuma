@@ -32,6 +32,10 @@ export default defineConfig({
         }),
     ],
     css: {
+        preprocessorOptions: {
+            // Preserve the API used by the existing Sass version and stylesheets.
+            scss: { api: "legacy" },
+        },
         postcss: {
             parser: postCssScss,
             map: false,

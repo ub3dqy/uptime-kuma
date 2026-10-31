@@ -100,4 +100,28 @@ test.describe("Retained history CSV", () => {
             .locator("section[aria-labelledby='export-history-title']")
             .screenshot({ path: testInfo.outputPath("history-export-russian.png") });
     });
+
+    test("preserves formatted descriptions while removing executable HTML", async ({ page, baseURL }) => {
+        await createMonitor(page, baseURL);
+        const monitorURL = page.url();
+        await page.getByRole("link", { name: "Edit", exact: true }).click();
+        await page
+            .locator("#description")
+            .fill(
+                '**Safe description** <img src="/invalid-test-image" onerror="window.kumaUnsafeHTML=true">' +
+                    '<script>window.kumaUnsafeHTML=true</script><a href="javascript:window.kumaUnsafeHTML=true">unsafe link</a>'
+            );
+        await page.getByTestId("save-button").click();
+        await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+        await page.goto(monitorURL);
+        await expect(page.locator("strong").filter({ hasText: "Safe description" })).toBeVisible();
+        const description = page.locator("p").filter({ hasText: "Safe description" }).last();
+        await expect(description.locator("script, [onerror], a[href^='javascript:']")).toHaveCount(0);
+        expect(await page.evaluate(() => window.kumaUnsafeHTML)).toBeUndefined();
+        await page.locator("header [data-bs-toggle='dropdown']").click();
+        await expect(page.locator("header .dropdown-menu")).toBeVisible();
+        await expect(
+            page.locator("header .dropdown-menu").getByRole("link", { name: "Settings", exact: true })
+        ).toBeVisible();
+    });
 });
