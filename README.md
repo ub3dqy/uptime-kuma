@@ -1,3 +1,8 @@
+> **ub3dqy edition** — independently maintained from Uptime Kuma 2.5.8.
+> Adds an authenticated CSV export of retained checks, with UTC ranges and spreadsheet formula protection.
+> [Fork documentation](FORK.md) · [Описание на русском](FORK.ru.md).
+> Use `npm run setup` to build this edition from source. The upstream documentation below is preserved for reference.
+
 <div align="center" width="100%">
     <img src="./public/icon.svg" width="128" alt="Uptime Kuma Logo" />
 </div>

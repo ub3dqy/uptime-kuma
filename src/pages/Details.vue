@@ -310,6 +310,9 @@
                 </div>
             </div>
 
+            <!-- Retained history export -->
+            <HeartbeatExport v-if="monitor.type !== 'group'" :key="monitor.id" :monitor-id="monitor.id" />
+
             <!-- Screenshot -->
             <div v-if="monitor.type === 'real-browser'" class="shadow-box">
                 <div class="row">
@@ -462,6 +465,7 @@ import "prismjs/components/prism-css";
 import { PrismEditor } from "vue-prism-editor";
 import "vue-prism-editor/dist/prismeditor.min.css";
 import ScreenshotDialog from "../components/ScreenshotDialog.vue";
+import HeartbeatExport from "../components/HeartbeatExport.vue";
 
 export default {
     components: {
@@ -477,6 +481,7 @@ export default {
         CertificateInfo,
         PrismEditor,
         ScreenshotDialog,
+        HeartbeatExport,
     },
     data() {
         return {

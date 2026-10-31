@@ -1,3 +1,13 @@
+# Scope of this fork
+
+This repository is `ub3dqy/uptime-kuma`, an independently maintained fork.
+Work requested here targets this fork. Preserve the MIT license and upstream
+attribution, review changes, and test them before publication. The contribution
+policy below is preserved from upstream and applies to submissions to
+`louislam/uptime-kuma`. Do not submit a change there without an explicit request.
+
+# Upstream contribution policy
+
 # Consequences of AI Slop
 
 - In your GitHub profile, there will be a pull request with title "[🚨⚠️AI Slop⚠️🚨] WARNING: THIS GUY CREATED AI SLOP, DO NOT TRUST! ", and you will not able to remove it!
