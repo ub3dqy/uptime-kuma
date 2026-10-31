@@ -11,6 +11,7 @@ dist-ssr
 .vscode
 
 /private
+/outputs
 /out
 /tmp
 .env

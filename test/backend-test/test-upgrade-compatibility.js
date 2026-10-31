@@ -266,10 +266,11 @@ test(
     "the current SFTP client completes SSH authentication and checks a remote path",
     { timeout: 15000 },
     async (context) => {
-        const { Server, utils } = require("ssh2");
+        const { Server } = require("ssh2");
+        const { generateEd25519KeyPair } = require("../fixtures/ssh-keys");
         const { SFTPMonitorType } = require("../../server/monitor-types/sftp");
         const clients = new Set();
-        const server = new Server({ hostKeys: [utils.generateKeyPairSync("ed25519").private] }, (client) => {
+        const server = new Server({ hostKeys: [generateEd25519KeyPair().private] }, (client) => {
             clients.add(client);
             client.on("error", () => {});
             client.on("close", () => clients.delete(client));

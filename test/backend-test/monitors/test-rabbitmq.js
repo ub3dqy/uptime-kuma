@@ -12,7 +12,9 @@ describe(
     () => {
         test("check() sets status to UP when RabbitMQ server is reachable", async () => {
             // The default timeout of 30 seconds might not be enough for the container to start
-            const rabbitMQContainer = await new RabbitMQContainer().withStartupTimeout(60000).start();
+            const rabbitMQContainer = await new RabbitMQContainer("rabbitmq:4.4.0-management-alpine")
+                .withStartupTimeout(60000)
+                .start();
             const rabbitMQMonitor = new RabbitMqMonitorType();
             const connectionString = `http://${rabbitMQContainer.getHost()}:${rabbitMQContainer.getMappedPort(15672)}`;
 
@@ -33,7 +35,7 @@ describe(
                 assert.strictEqual(heartbeat.status, UP);
                 assert.strictEqual(heartbeat.msg, "Node is reachable and there are no alerts in the cluster");
             } finally {
-                rabbitMQContainer.stop();
+                await rabbitMQContainer.stop();
             }
         });
 
@@ -58,7 +60,9 @@ describe(
         });
 
         test("checkSingleNode() succeeds when node is healthy", async () => {
-            const rabbitMQContainer = await new RabbitMQContainer().withStartupTimeout(60000).start();
+            const rabbitMQContainer = await new RabbitMQContainer("rabbitmq:4.4.0-management-alpine")
+                .withStartupTimeout(60000)
+                .start();
             const rabbitMQMonitor = new RabbitMqMonitorType();
             const connectionString = `http://${rabbitMQContainer.getHost()}:${rabbitMQContainer.getMappedPort(15672)}`;
 
@@ -73,7 +77,7 @@ describe(
                 // Should not throw - just validates the node is healthy
                 await rabbitMQMonitor.checkSingleNode(monitor, connectionString, "1/1");
             } finally {
-                rabbitMQContainer.stop();
+                await rabbitMQContainer.stop();
             }
         });
 

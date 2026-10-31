@@ -1,4 +1,4 @@
-const { sync: rimrafSync } = require("rimraf");
+const { rmSync } = require("node:fs");
 const Database = require("../server/database");
 
 class TestDB {
@@ -20,7 +20,9 @@ class TestDB {
 
     async destroy() {
         await Database.close();
-        this.dataDir && rimrafSync(this.dataDir);
+        if (this.dataDir) {
+            rmSync(this.dataDir, { recursive: true, force: true });
+        }
     }
 }
 

@@ -62,8 +62,8 @@ describe("Database Migration", () => {
             skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
         },
         async () => {
-            // Start MariaDB container (using MariaDB 12 to match current production)
-            const mariadbContainer = await new GenericContainer("mariadb:12")
+            // Pin the database version so later image releases cannot change this test.
+            const mariadbContainer = await new GenericContainer("mariadb:12.3.3")
                 .withEnvironment({
                     MYSQL_ROOT_PASSWORD: "root",
                     MYSQL_DATABASE: "kuma_test",
@@ -134,8 +134,12 @@ describe("Database Migration", () => {
             skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
         },
         async () => {
-            // Start MySQL 8.0 container (the version mentioned in the issue)
-            const mysqlContainer = await new MySqlContainer("mysql:8.0").withStartupTimeout(120000).start();
+            // Exercise the current MySQL 8.4 LTS line alongside MariaDB and SQLite.
+            const mysqlContainer = await new MySqlContainer(
+                "mysql:8.4@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7"
+            )
+                .withStartupTimeout(120000)
+                .start();
 
             const knex = require("knex");
             const knexInstance = knex({

@@ -102,14 +102,38 @@ and passes the same eight browser scenarios against a fresh isolated SQLite data
 The newly compiled healthcheck also passes. The TypeScript push example executes
 on Node 24 without installing a compiler or making an external test request.
 
-The complete Docker/container suite did not complete: its required MariaDB/MySQL
-images did not start in this environment. The portable MariaDB checks and the
+The complete Docker/container attempt on 31 October did not complete: its required
+MariaDB/MySQL images did not start in that attempt. The portable MariaDB checks and the
 Linux/amd64 release acceptance above are separate evidence. Other architectures,
 macOS, real customer data and external notification
 vendors or database services requiring separate infrastructure/accounts are not
 qualified by local fixtures. No production deployment or Actions run was enabled.
 Build this fork's container base locally before its main image; upstream prebuilt
 images do not contain the updated runtime or this fork's additions.
+
+## Follow-up validation — 1 November 2026
+
+The complete Windows backend invocation now reports 227 passing tests, zero
+failures and six skipped tests. Linux-only suites retain their platform guards.
+Separate container runs cover 19 MQTT scenarios, four MySQL/MariaDB monitor
+scenarios, two PostgreSQL scenarios, nine RabbitMQ scenarios, 17 SFTP scenarios
+and three database migration scenarios. All have passing results in the focused
+runs; this does not claim one successful complete Linux suite. The three schema
+tests exercise SQLite, MariaDB 12.3.3 and MySQL 8.4 LTS, including all migrations.
+
+Testcontainers 12 now receives explicit service images. MQTT fixtures wait for a
+retained publication acknowledgement before starting the monitor; MariaDB fixtures
+wait for the final database server after initialization. Teardown is awaited.
+The test database uses Node's built-in file removal instead of an undeclared old
+package. Ed25519 test keys are validated during generation, because ssh2 1.17 can
+occasionally generate a malformed key; application key parsing is unchanged.
+
+Domain-expiry tests use fixed RDAP network responses and keep their real parsing,
+database and notification paths. They no longer depend on live registration dates
+or use a retry helper that can hide failed assertions. This is fixture coverage,
+not validation of external registries. The full npm audit still reports zero
+advisories. Local owner reports are excluded from Git and Docker build contexts.
+The platform, vendor and production-deployment limitations above still apply.
 
 ## Primary references
 

@@ -23,7 +23,7 @@ async function testMqtt(
     publishTopic = "test",
     conditions = null
 ) {
-    const hiveMQContainer = await new HiveMQContainer().start();
+    const hiveMQContainer = await new HiveMQContainer("hivemq/hivemq-ce:2026.5").start();
     const connectionString = hiveMQContainer.getConnectionString();
     const mqttMonitorType = new MqttMonitorType();
     const monitor = {
@@ -45,20 +45,22 @@ async function testMqtt(
         status: PENDING,
     };
 
-    const testMqttClient = mqtt.connect(hiveMQContainer.getConnectionString());
-    testMqttClient.on("connect", () => {
-        testMqttClient.subscribe(monitorTopic, (error) => {
-            if (!error) {
-                testMqttClient.publish(publishTopic, receivedMessage);
-            }
-        });
-    });
-
+    let testMqttClient;
     try {
+        testMqttClient = await mqtt.connectAsync(hiveMQContainer.getConnectionString(), {
+            reconnectPeriod: 0,
+            connectTimeout: 15000,
+        });
+        // Wait for the broker's acknowledgement before starting the monitor's
+        // timeout. Its retained observation is independent of subscription order.
+        await testMqttClient.publishAsync(publishTopic, receivedMessage, { qos: 1, retain: true });
         await mqttMonitorType.check(monitor, heartbeat, {});
     } finally {
-        testMqttClient.end();
-        hiveMQContainer.stop();
+        try {
+            await testMqttClient?.endAsync();
+        } finally {
+            await hiveMQContainer.stop();
+        }
     }
     return heartbeat;
 }
@@ -66,7 +68,7 @@ async function testMqtt(
 describe(
     "MqttMonitorType",
     {
-        concurrency: 4,
+        concurrency: 2,
         skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
     },
     () => {

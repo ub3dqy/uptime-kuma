@@ -8,6 +8,7 @@ const { Server, utils: sshUtils } = require("ssh2");
 const { GenericContainer, Wait } = require("testcontainers");
 const { SFTPMonitorType } = require("../../../server/monitor-types/sftp");
 const { UP, PENDING } = require("../../../src/util");
+const { generateEd25519KeyPair } = require("../../fixtures/ssh-keys");
 
 // ---------------------------------------------------------------------------
 // STATUS_CODE: ssh2 exposes this under utils.sftp (NOT as a top-level export)
@@ -17,8 +18,8 @@ const { STATUS_CODE } = sshUtils.sftp;
 // ---------------------------------------------------------------------------
 // Host / client key material — generated once for the entire test suite
 // ---------------------------------------------------------------------------
-const HOST_KEY = sshUtils.generateKeyPairSync("ed25519").private;
-const clientKeyPair = sshUtils.generateKeyPairSync("ed25519");
+const HOST_KEY = generateEd25519KeyPair().private;
+const clientKeyPair = generateEd25519KeyPair();
 /** PEM-encoded private key string to pass as monitor.sshPrivateKey */
 const CLIENT_PRIVATE_KEY = clientKeyPair.private.toString("utf8");
 const parsedClientPubKey = sshUtils.parseKey(clientKeyPair.public);
@@ -32,7 +33,7 @@ const EXISTING_PATH = "/existing/path";
 // ---------------------------------------------------------------------------
 
 /** Pinned so the suite cannot break when a new image is published upstream. */
-const SSH_IMAGE = "lscr.io/linuxserver/openssh-server:10.3_p1-r0-ls233";
+const SSH_IMAGE = "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls240";
 /** Port sshd listens on inside the linuxserver image (not 22). */
 const SSH_CONTAINER_PORT = 2222;
 /** Home directory of the ssh user in the image; used for the path-exists check. */
