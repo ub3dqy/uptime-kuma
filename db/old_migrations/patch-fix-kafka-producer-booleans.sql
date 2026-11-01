@@ -15,14 +15,20 @@ ALTER TABLE monitor
 ALTER TABLE monitor
     ADD COLUMN kafka_producer_allow_auto_topic_creation BOOLEAN default 0 NOT NULL;
 
--- These SQL is still not fully safe. See https://github.com/louislam/uptime-kuma/issues/4039.
+-- Normalize legacy booleans before removing the original values.
+-- Unknown non-empty TLS values remain enabled rather than silently weakening transport security.
+UPDATE monitor SET kafka_producer_ssl = CASE
+    WHEN kafka_producer_ssl_old IS NULL THEN 0
+    WHEN typeof(kafka_producer_ssl_old) IN ('integer', 'real') THEN kafka_producer_ssl_old <> 0
+    WHEN lower(trim(CAST(kafka_producer_ssl_old AS TEXT))) IN ('', '0', 'false', 'no', 'off') THEN 0
+    ELSE 1
+END;
 
--- Set bring old values from `_old` COLUMNs to correct ones
--- UPDATE monitor SET kafka_producer_allow_auto_topic_creation = monitor.kafka_producer_allow_auto_topic_creation_old
--- WHERE monitor.kafka_producer_allow_auto_topic_creation_old IS NOT NULL;
-
--- UPDATE monitor SET kafka_producer_ssl = monitor.kafka_producer_ssl_old
--- WHERE monitor.kafka_producer_ssl_old IS NOT NULL;
+UPDATE monitor SET kafka_producer_allow_auto_topic_creation = CASE
+    WHEN typeof(kafka_producer_allow_auto_topic_creation_old) IN ('integer', 'real') THEN kafka_producer_allow_auto_topic_creation_old <> 0
+    WHEN lower(trim(CAST(kafka_producer_allow_auto_topic_creation_old AS TEXT))) IN ('1', 'true', 'yes', 'on') THEN 1
+    ELSE 0
+END;
 
 -- Remove old COLUMNs
 ALTER TABLE monitor

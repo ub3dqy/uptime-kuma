@@ -62,6 +62,7 @@ const zlib = require("node:zlib");
 const { promisify } = require("node:util");
 const brotliCompress = promisify(zlib.brotliCompress);
 const DomainExpiry = require("./domain_expiry");
+const { parseSshHostFingerprint } = require("../utils/ssh-host-key");
 
 const rootCertificates = rootCertificatesFingerprints();
 
@@ -207,6 +208,7 @@ class Monitor extends BeanModel {
             ipFamily: this.ipFamily,
             sftpPath: this.sftpPath,
             sshAuthMethod: this.sshAuthMethod || "password",
+            sshHostKeyFingerprint: this.sshHostKeyFingerprint || "",
 
             // ping advanced options
             ping_numeric: this.isPingNumeric(),
@@ -1155,6 +1157,8 @@ class Monitor extends BeanModel {
      * @returns {object} Axios response
      */
     async makeAxiosRequest(options, finalCall = false) {
+        // Bound decompressed bodies before Axios buffers or parses them, including NTLM responses.
+        options.maxContentLength = 10 * 1024 * 1024;
         try {
             let res;
             if (this.auth_method === "ntlm") {
@@ -1177,7 +1181,7 @@ class Monitor extends BeanModel {
              * Make a single attempt to obtain an new access token in the event that
              * the recent api request failed for authentication purposes
              */
-            if (this.auth_method === "oauth2-cc" && error.response.status === 401 && !finalCall) {
+            if (this.auth_method === "oauth2-cc" && error.response?.status === 401 && !finalCall) {
                 this.oauthAccessToken = await this.makeOidcTokenClientCredentialsRequest();
                 let oauth2AuthHeader = {
                     Authorization: this.oauthAccessToken.token_type + " " + this.oauthAccessToken.access_token,
@@ -1628,6 +1632,9 @@ class Monitor extends BeanModel {
      * @throws {Error} If validation fails
      */
     validate() {
+        if (this.type === "sftp") {
+            parseSshHostFingerprint(this.sshHostKeyFingerprint);
+        }
         if (this.interval < MIN_INTERVAL_SECOND) {
             throw new Error(`Interval cannot be less than ${MIN_INTERVAL_SECOND} seconds`);
         }

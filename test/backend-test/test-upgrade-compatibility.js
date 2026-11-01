@@ -266,11 +266,19 @@ test(
     "the current SFTP client completes SSH authentication and checks a remote path",
     { timeout: 15000 },
     async (context) => {
-        const { Server } = require("ssh2");
+        const { Server, utils } = require("ssh2");
         const { generateEd25519KeyPair } = require("../fixtures/ssh-keys");
         const { SFTPMonitorType } = require("../../server/monitor-types/sftp");
         const clients = new Set();
-        const server = new Server({ hostKeys: [generateEd25519KeyPair().private] }, (client) => {
+        const hostKey = generateEd25519KeyPair().private;
+        const fingerprint =
+            "SHA256:" +
+            require("node:crypto")
+                .createHash("sha256")
+                .update(utils.parseKey(hostKey).getPublicSSH())
+                .digest("base64")
+                .replace(/=$/, "");
+        const server = new Server({ hostKeys: [hostKey] }, (client) => {
             clients.add(client);
             client.on("error", () => {});
             client.on("close", () => clients.delete(client));
@@ -310,6 +318,7 @@ test(
             port: server.address().port,
             sshUsername: "test",
             sshPassword: "fixture",
+            sshHostKeyFingerprint: fingerprint,
             sftpPath: "/fixture",
             timeout: 2,
         };

@@ -1636,5 +1636,7 @@
     "Pattern Code ID": "Pattern Code ID",
     "Amoot SMS pattern help": "Enter the Pattern Code ID from your Amoot SMS panel. {0}",
     "Create an Amoot SMS pattern": "Create an Amoot SMS pattern",
-    "Use Own Line for Pattern": "Use Own Line for Pattern"
+    "Use Own Line for Pattern": "Use Own Line for Pattern",
+    "SSH Host Key Fingerprint": "SSH host key fingerprint",
+    "sshHostKeyFingerprintHelp": "Get the SHA256 fingerprint from the server administrator through a trusted channel. A missing or changed key prevents authentication, including for existing monitors."
 }

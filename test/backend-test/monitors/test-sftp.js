@@ -2,13 +2,15 @@
 
 const { describe, test, before, after } = require("node:test");
 const assert = require("node:assert");
-const { timingSafeEqual } = require("crypto");
+const { timingSafeEqual, createHash } = require("crypto");
 const { constants } = require("fs");
 const { Server, utils: sshUtils } = require("ssh2");
 const { GenericContainer, Wait } = require("testcontainers");
 const { SFTPMonitorType } = require("../../../server/monitor-types/sftp");
 const { UP, PENDING } = require("../../../src/util");
 const { generateEd25519KeyPair } = require("../../fixtures/ssh-keys");
+const net = require("node:net");
+const SftpClient = require("ssh2-sftp-client");
 
 // ---------------------------------------------------------------------------
 // STATUS_CODE: ssh2 exposes this under utils.sftp (NOT as a top-level export)
@@ -19,6 +21,9 @@ const { STATUS_CODE } = sshUtils.sftp;
 // Host / client key material — generated once for the entire test suite
 // ---------------------------------------------------------------------------
 const HOST_KEY = generateEd25519KeyPair().private;
+const HOST_FINGERPRINT =
+    "SHA256:" +
+    createHash("sha256").update(sshUtils.parseKey(HOST_KEY).getPublicSSH()).digest("base64").replace(/=$/, "");
 const clientKeyPair = generateEd25519KeyPair();
 /** PEM-encoded private key string to pass as monitor.sshPrivateKey */
 const CLIENT_PRIVATE_KEY = clientKeyPair.private.toString("utf8");
@@ -64,6 +69,7 @@ function createSftpServer(opts = {}) {
     return new Promise((resolve, reject) => {
         const server = new Server({ hostKeys: [HOST_KEY] }, (client) => {
             client.on("authentication", (ctx) => {
+                opts.onAuthentication?.(ctx);
                 if (ctx.username !== TEST_USER) {
                     return ctx.reject();
                 }
@@ -148,6 +154,7 @@ function makeMonitor(overrides) {
         hostname: "127.0.0.1",
         port: null,
         sshUsername: TEST_USER,
+        sshHostKeyFingerprint: HOST_FINGERPRINT,
         sshAuthMethod: "password",
         sshPassword: TEST_PASSWORD,
         sshPrivateKey: null,
@@ -156,6 +163,65 @@ function makeMonitor(overrides) {
         ...overrides,
     };
 }
+
+test("SFTP rejects an unconfirmed host key before sending authentication", async (context) => {
+    let authentications = 0;
+    const peer = await createSftpServer({ acceptPassword: true, onAuthentication: () => authentications++ });
+    context.after(peer.close);
+    const monitor = new SFTPMonitorType();
+    for (const fingerprint of [null, "SHA256:" + Buffer.alloc(32, 1).toString("base64").replace(/=$/, "")]) {
+        await assert.rejects(
+            monitor.check(makeMonitor({ port: peer.port, sshHostKeyFingerprint: fingerprint }), {}, {}),
+            /host|fingerprint/i
+        );
+    }
+    assert.strictEqual(authentications, 0);
+});
+
+test(
+    "SFTP destroys a rejected connection even when the peer keeps its TCP half open",
+    { timeout: 5000 },
+    async (context) => {
+        const peer = await createSftpServer({ acceptPassword: true });
+        const sockets = new Set();
+        const proxy = net.createServer({ allowHalfOpen: true }, (socket) => {
+            const upstream = net.connect(peer.port, "127.0.0.1");
+            for (const connection of [socket, upstream]) {
+                sockets.add(connection);
+                connection.on("error", () => {});
+            }
+            socket.pipe(upstream, { end: false });
+            upstream.pipe(socket, { end: false });
+        });
+        await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+        context.after(async () => {
+            for (const socket of sockets) {
+                socket.destroy();
+            }
+            await new Promise((resolve) => proxy.close(resolve));
+            await peer.close();
+        });
+        let client;
+        const connect = SftpClient.prototype.connect;
+        context.mock.method(SftpClient.prototype, "connect", function (options) {
+            client = this.client;
+            return connect.call(this, options);
+        });
+        await assert.rejects(
+            new SFTPMonitorType().check(
+                makeMonitor({
+                    port: proxy.address().port,
+                    timeout: 1,
+                    sshHostKeyFingerprint: "SHA256:" + Buffer.alloc(32, 1).toString("base64").replace(/=$/, ""),
+                }),
+                {},
+                {}
+            ),
+            /host|verification/i
+        );
+        assert.strictEqual(client._sock.destroyed, true);
+    }
+);
 
 /**
  * Returns a fresh heartbeat object in PENDING state.
@@ -313,6 +379,7 @@ describe(
         let port;
         let rsaPrivateKey;
         let encryptedPrivateKey;
+        let hostFingerprint;
 
         before(async () => {
             monitor = new SFTPMonitorType();
@@ -352,6 +419,14 @@ describe(
 
             host = container.getHost();
             port = container.getMappedPort(SSH_CONTAINER_PORT);
+            const hostKey = await container.exec(["cat", "/config/ssh_host_keys/ssh_host_ed25519_key.pub"]);
+            assert.strictEqual(hostKey.exitCode, 0);
+            hostFingerprint =
+                "SHA256:" +
+                createHash("sha256")
+                    .update(sshUtils.parseKey(hostKey.stdout.trim()).getPublicSSH())
+                    .digest("base64")
+                    .replace(/=$/, "");
         });
 
         after(async () => {
@@ -360,7 +435,11 @@ describe(
 
         test("check() sets status to UP with correct password", async () => {
             const heartbeat = makeHeartbeat();
-            await monitor.check(makeMonitor({ hostname: host, port }), heartbeat, {});
+            await monitor.check(
+                makeMonitor({ hostname: host, port, sshHostKeyFingerprint: hostFingerprint }),
+                heartbeat,
+                {}
+            );
 
             assert.strictEqual(heartbeat.status, UP);
             assert.ok(heartbeat.msg.toLowerCase().includes("successful"), `unexpected msg: "${heartbeat.msg}"`);
@@ -372,6 +451,7 @@ describe(
                 makeMonitor({
                     hostname: host,
                     port,
+                    sshHostKeyFingerprint: hostFingerprint,
                     sshAuthMethod: "privateKey",
                     sshPrivateKey: rsaPrivateKey,
                 }),
@@ -389,6 +469,7 @@ describe(
                 makeMonitor({
                     hostname: host,
                     port,
+                    sshHostKeyFingerprint: hostFingerprint,
                     sshAuthMethod: "privateKey",
                     sshPrivateKey: encryptedPrivateKey,
                     sshPassphrase: KEY_PASSPHRASE,
@@ -408,6 +489,7 @@ describe(
                     makeMonitor({
                         hostname: host,
                         port,
+                        sshHostKeyFingerprint: hostFingerprint,
                         sshAuthMethod: "privateKey",
                         sshPrivateKey: encryptedPrivateKey,
                         sshPassphrase: null,
@@ -426,6 +508,7 @@ describe(
                     makeMonitor({
                         hostname: host,
                         port,
+                        sshHostKeyFingerprint: hostFingerprint,
                         sshAuthMethod: "privateKey",
                         sshPrivateKey: encryptedPrivateKey,
                         sshPassphrase: "wrongpassphrase",
@@ -438,7 +521,11 @@ describe(
 
         test("check() records heartbeat.ping as the connection latency", async () => {
             const heartbeat = makeHeartbeat();
-            await monitor.check(makeMonitor({ hostname: host, port }), heartbeat, {});
+            await monitor.check(
+                makeMonitor({ hostname: host, port, sshHostKeyFingerprint: hostFingerprint }),
+                heartbeat,
+                {}
+            );
 
             assert.strictEqual(typeof heartbeat.ping, "number");
             assert.ok(heartbeat.ping >= 0, `ping should be non-negative, got ${heartbeat.ping}`);
@@ -446,7 +533,11 @@ describe(
 
         test("check() sets status to UP when sftpPath exists on server", async () => {
             const heartbeat = makeHeartbeat();
-            await monitor.check(makeMonitor({ hostname: host, port, sftpPath: CONTAINER_HOME }), heartbeat, {});
+            await monitor.check(
+                makeMonitor({ hostname: host, port, sshHostKeyFingerprint: hostFingerprint, sftpPath: CONTAINER_HOME }),
+                heartbeat,
+                {}
+            );
 
             assert.strictEqual(heartbeat.status, UP);
         });
@@ -454,7 +545,16 @@ describe(
         test("check() throws when sftpPath does not exist on server", async () => {
             const heartbeat = makeHeartbeat();
             await assert.rejects(
-                monitor.check(makeMonitor({ hostname: host, port, sftpPath: "/does/not/exist" }), heartbeat, {}),
+                monitor.check(
+                    makeMonitor({
+                        hostname: host,
+                        port,
+                        sshHostKeyFingerprint: hostFingerprint,
+                        sftpPath: "/does/not/exist",
+                    }),
+                    heartbeat,
+                    {}
+                ),
                 /does not exist/i
             );
         });
@@ -462,7 +562,16 @@ describe(
         test("check() throws when password is wrong", async () => {
             const heartbeat = makeHeartbeat();
             await assert.rejects(
-                monitor.check(makeMonitor({ hostname: host, port, sshPassword: "wrongpassword" }), heartbeat, {})
+                monitor.check(
+                    makeMonitor({
+                        hostname: host,
+                        port,
+                        sshHostKeyFingerprint: hostFingerprint,
+                        sshPassword: "wrongpassword",
+                    }),
+                    heartbeat,
+                    {}
+                )
             );
         });
     }

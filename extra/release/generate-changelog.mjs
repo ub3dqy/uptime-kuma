@@ -3,6 +3,55 @@
 // GitHub CLI (gh command) is required
 
 import * as childProcess from "child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+/**
+ * Resolve a native executable or the Node entry behind a Windows npm shim.
+ * @param {string} platform Operating system.
+ * @param {string} searchPath Executable search path.
+ * @returns {string[]} Executable and any fixed leading arguments.
+ */
+export function resolveOpenCodeCommand(platform = process.platform, searchPath = process.env.PATH || "") {
+    if (platform !== "win32") {
+        return ["opencode"];
+    }
+    for (const directory of searchPath.split(";").filter(Boolean)) {
+        const root = path.resolve(directory.replace(/^"|"$/g, ""));
+        const executable = path.join(root, "opencode.exe");
+        if (fs.existsSync(executable) && fs.statSync(executable).isFile()) {
+            return [executable];
+        }
+        if (!fs.existsSync(path.join(root, "opencode.cmd"))) {
+            continue;
+        }
+        for (const packageRoot of [
+            path.join(root, "node_modules", "opencode-ai"),
+            path.resolve(root, "..", "opencode-ai"),
+        ]) {
+            const manifest = path.join(packageRoot, "package.json");
+            if (!fs.existsSync(manifest)) {
+                continue;
+            }
+            const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+            const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.opencode;
+            if (typeof bin !== "string") {
+                continue;
+            }
+            const entry = path.resolve(packageRoot, bin);
+            const relative = path.relative(packageRoot, entry);
+            if (relative.startsWith("..") || path.isAbsolute(relative) || /\.(cmd|bat)$/i.test(entry)) {
+                continue;
+            }
+            if (fs.existsSync(entry) && fs.statSync(entry).isFile()) {
+                return /\.exe$/i.test(entry) ? [entry] : [process.execPath, entry];
+            }
+        }
+    }
+    throw new Error(
+        "OpenCode requires a native executable or its installed opencode-ai Node entry; batch shims are not executed"
+    );
+}
 
 const ignoreList = [
     "louislam",
@@ -208,13 +257,14 @@ export async function generateChangelogAI(previousVersion) {
         console.log(`Running opencode with the above prompt... (attempt ${attempt}/${maxAttempts})`);
 
         try {
+            const [executable, ...leadingArgs] = resolveOpenCodeCommand();
             const result = childProcess.spawnSync(
-                "opencode",
-                ["run", "-m", "opencode/big-pickle", "--format", "json", llmPrompt],
+                executable,
+                [...leadingArgs, "run", "-m", "opencode/big-pickle", "--format", "json", llmPrompt],
                 {
                     encoding: "utf-8",
                     timeout: 300000,
-                    shell: true,
+                    shell: false,
                     cwd: process.cwd(),
                     env: process.env,
                 }

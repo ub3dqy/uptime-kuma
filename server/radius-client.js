@@ -10,6 +10,7 @@
 
 const dgram = require("dgram");
 const radius = require("radius");
+const { createHash, timingSafeEqual } = require("node:crypto");
 
 /**
  * RADIUS Client class
@@ -47,6 +48,7 @@ class RadiusClient {
                 code: "Access-Request",
                 secret: secret,
                 attributes: {},
+                add_message_authenticator: true,
             };
 
             // Convert attributes array to object
@@ -99,12 +101,15 @@ class RadiusClient {
 
                 attempts++;
 
-                socket.send(encodedPacket, 0, encodedPacket.length, this.port, this.host, (err) => {
+                socket.send(encodedPacket, (err) => {
                     if (err) {
                         cleanup();
                         return reject(new Error(`Failed to send RADIUS request: ${err.message}`));
                     }
 
+                    if (responseReceived || socketClosed) {
+                        return;
+                    }
                     // Set timeout for this attempt
                     timeoutHandle = setTimeout(() => {
                         if (responseReceived || socketClosed) {
@@ -129,18 +134,41 @@ class RadiusClient {
                     return;
                 }
 
-                responseReceived = true;
-                cleanup();
-
                 let response;
                 try {
-                    response = radius.decode({ packet: msg, secret: secret });
+                    if (msg.length < 20 || msg[1] !== encodedPacket[1]) {
+                        return;
+                    }
+                    const length = msg.readUInt16BE(2);
+                    if (length < 20 || length > msg.length || length > 4096) {
+                        return;
+                    }
+                    const packet = msg.subarray(0, length);
+                    const expected = createHash("md5")
+                        .update(packet.subarray(0, 4))
+                        .update(encodedPacket.subarray(4, 20))
+                        .update(packet.subarray(20))
+                        .update(secret)
+                        .digest();
+                    if (
+                        !timingSafeEqual(expected, packet.subarray(4, 20)) ||
+                        !radius.verify_response({ request: encodedPacket, response: packet, secret })
+                    ) {
+                        return;
+                    }
+                    response = radius.decode({ packet, secret });
                 } catch (error) {
-                    return reject(new Error(`RADIUS response decoding failed: ${error.message}`));
+                    // Ignore unauthenticated/malformed datagrams and keep waiting for the real response.
+                    return;
                 }
 
                 // Map response code to match node-radius-client format
                 const responseCode = response.code;
+                if (!["Access-Accept", "Access-Reject", "Access-Challenge"].includes(responseCode)) {
+                    return;
+                }
+                responseReceived = true;
+                cleanup();
 
                 if (responseCode === "Access-Accept") {
                     resolve({ code: "Access-Accept", ...response });
@@ -151,8 +179,6 @@ class RadiusClient {
                     reject(error);
                 } else if (responseCode === "Access-Challenge") {
                     resolve({ code: "Access-Challenge", ...response });
-                } else {
-                    resolve({ code: responseCode, ...response });
                 }
             });
 
@@ -166,7 +192,8 @@ class RadiusClient {
             });
 
             // Start first request
-            sendRequest();
+            // A connected UDP socket only receives datagrams from this resolved peer and port.
+            socket.connect(this.port, this.host, sendRequest);
         });
     }
 }

@@ -142,11 +142,11 @@ test.describe("Retained history CSV", () => {
         const editor = page.getByTestId("custom-css-input").locator("textarea");
         await editor.fill("body { --upgrade-proof: 42; }");
         await page.locator("h1 [contenteditable=true]").fill("Updated title");
+        const reloaded = page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame());
         await page.getByTestId("save-button").click();
+        await reloaded;
         await expect(page.getByRole("heading", { name: "Updated title", exact: true })).toBeVisible();
-        await expect
-            .poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--upgrade-proof").trim()))
-            .toBe("42");
+        await expect(page.locator("body")).toHaveCSS("--upgrade-proof", "42");
         await page.getByTestId("edit-button").click();
         await expect(editor).toHaveValue("body { --upgrade-proof: 42; }");
         expect(errors).toEqual([]);

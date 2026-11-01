@@ -1,11 +1,15 @@
 # Download Apprise deb package
 FROM node:24.22.2-bookworm-slim AS download-apprise
 WORKDIR /app
-COPY ./extra/download-apprise.mjs ./download-apprise.mjs
-RUN apt update && \
-    apt --yes --no-install-recommends install curl && \
-    npm install cheerio semver && \
-    node ./download-apprise.mjs
+ARG APPRISE_VERSION=2.1.0-1
+# APT verifies the signed Debian index and the package hash before the file is copied.
+# Download only this package from sid; runtime dependencies still come from bookworm.
+RUN apt-get update && \
+    apt-get --yes --no-install-recommends install ca-certificates debian-archive-keyring && \
+    printf '%s\n' 'deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://deb.debian.org/debian sid main' > /etc/apt/sources.list.d/apprise.list && \
+    apt-get update && \
+    apt-get download "apprise=${APPRISE_VERSION}" && \
+    mv "apprise_${APPRISE_VERSION}_all.deb" apprise.deb
 
 # Base Image (Slim)
 # If the image changed, the second stage image should be changed too

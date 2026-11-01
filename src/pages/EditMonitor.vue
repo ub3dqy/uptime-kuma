@@ -815,6 +815,25 @@
                             <!-- SFTP Monitor Fields -->
                             <template v-if="monitor.type === 'sftp'">
                                 <div class="my-3">
+                                    <label for="ssh_host_key_fingerprint" class="form-label">
+                                        {{ $t("SSH Host Key Fingerprint") }}
+                                    </label>
+                                    <input
+                                        id="ssh_host_key_fingerprint"
+                                        v-model.trim="monitor.sshHostKeyFingerprint"
+                                        type="text"
+                                        class="form-control"
+                                        placeholder="SHA256:..."
+                                        pattern="SHA256:[A-Za-z0-9+\/]{43}=?"
+                                        required
+                                        autocomplete="off"
+                                        aria-describedby="ssh_host_key_help"
+                                    />
+                                    <div id="ssh_host_key_help" class="form-text">
+                                        {{ $t("sshHostKeyFingerprintHelp") }}
+                                    </div>
+                                </div>
+                                <div class="my-3">
                                     <label for="ssh_username" class="form-label">{{ $t("Username") }}</label>
                                     <input
                                         id="ssh_username"
@@ -3362,6 +3381,7 @@ const monitorDefaults = {
     conditions: [],
     system_service_name: "",
     sshAuthMethod: "password",
+    sshHostKeyFingerprint: "",
     ntpStratumThreshold: 5,
     ntpTimeOffsetThreshold: 1000,
     ntpRootDispersionThreshold: 500,

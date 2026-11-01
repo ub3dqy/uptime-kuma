@@ -135,6 +135,79 @@ not validation of external registries. The full npm audit still reports zero
 advisories. Local owner reports are excluded from Git and Docker build contexts.
 The platform, vendor and production-deployment limitations above still apply.
 
+## Source review and hardening — 1 November 2026
+
+The recovered source review targets immutable revision `dfea9c9a`. It covered
+733 implementation, configuration, documentation and test files and assessed 82
+data files. Five binary icons and upstream maintainer-only guidance were explicitly
+excluded. Eleven distinct source-backed issues survived validation. The private
+scan report retains their evidence and deployment assumptions. It is not a claim
+that every deployment is exposed, or that a package advisory count describes the
+application's complete security.
+
+The subsequent patch separates RSS cache entries by every request-origin input,
+bounds response-cache retention to 1,000 entries and 32 MiB of counted content,
+key and header bytes (the JavaScript heap has additional overhead), limits each cached
+response to 1 MiB and each cache key to 2 KiB, and avoids caching HTTP errors.
+Oversized responses are still served completely without being retained. Cache
+replacement, eviction and clearing also remove indexes and timers.
+
+SFTP checks validate a mandatory, owner-confirmed SHA256 host-key fingerprint
+before authentication and close failed connections without waiting for the peer.
+The fingerprint is stored by a new migration and survives creation, editing and
+reload. Existing SFTP monitors require operator action; no unsafe fallback or
+trust-on-first-use mode is enabled.
+
+RADIUS binds its UDP socket to the resolved peer, correlates identifiers and
+verifies raw response-authenticator bytes before accepting a result. Requests
+include Message-Authenticator and responses must include its valid counterpart.
+Malformed or unauthenticated datagrams do not terminate the wait for a valid reply.
+
+HTTP response buffering is bounded to 10 MiB after decompression, including NTLM.
+OAuth and NTLM error paths preserve transport/size errors without dereferencing
+a nonexistent response. HTTP password and API-key verification reserve rate-limit
+capacity before asynchronous work. Successful HTTP attempts consume the same
+20/60-per-minute instance-wide allowance.
+
+SMSManager parameters are encoded as data and retain the configured recipient
+and gateway. Aliyun SMS starts with HTTPS and refuses redirects. Provider controls
+use local adapters; no real SMS, paid transaction or vendor account was exercised.
+
+Release categorization passes PR text without a shell. Windows resolves a native
+OpenCode executable or the Node entry in its npm installation instead of executing
+a batch shim. This does not install OpenCode or invoke a model service during tests.
+Apprise is pinned to Debian `2.1.0-1`, downloaded by APT from a signed Debian index
+over HTTPS and checked against that index before installation; the previous
+unsigned HTTP directory downloader was removed. The container retains the MIT
+license and upstream attribution.
+
+The old Kafka boolean migration now normalizes retained values before dropping
+their original columns. Unknown nonempty TLS values remain enabled. A database
+that already lost its earlier value needs operator comparison with a backup.
+
+Peer dependency checks are enabled rather than ignored. Undici and Keyv are
+placed at compatible versions for their respective consumers, including the
+release HTTP client and cookie agents. This preserves the current direct package
+versions without forcing incompatible consumers onto one nested version.
+
+Status-page editing waits for both initial settings responses before enabling
+inputs. A late public response no longer replaces authenticated editor settings,
+and reconnecting does not discard unsaved values. The browser regression checks
+the saved title and CSS after the page's actual reload.
+
+Post-patch checks: the Windows backend suite has 249 passing tests, zero failures
+and six platform skips. A separate service run has 22 passing cases: 19 SFTP
+checks including OpenSSH and a peer that keeps a rejected connection half open,
+plus fresh SQLite, MariaDB 12.3.3 and MySQL 8.4 LTS migrations. Nine Chrome
+scenarios pass on Windows, including fingerprint creation/editing and title/CSS
+persistence after a real reload. The same nine scenarios also pass against a
+fresh Linux/amd64 release container built with `npm ci --omit=dev`. Its healthcheck,
+native modules, saved fingerprint, retained title/CSS and SQLite integrity pass.
+The application build, utility type check and dependency-tree validation pass;
+the full npm audit has zero advisories. Lint has zero errors; existing warnings
+were not suppressed. No permanent-server or external notification-vendor test
+is implied by these local results.
+
 ## Primary references
 
 - [Node release index](https://nodejs.org/dist/index.json)

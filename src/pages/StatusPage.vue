@@ -695,6 +695,9 @@ export default {
             loadedData: false,
             baseURL: "",
             clickedEditButton: false,
+            publicConfigLoaded: false,
+            privateConfigLoaded: false,
+            privateConfigLoading: false,
             maintenanceList: [],
             lastUpdateTime: dayjs(),
             updateCountdown: null,
@@ -898,17 +901,7 @@ export default {
          */
         "$root.loggedIn"(loggedIn) {
             if (loggedIn) {
-                this.$root.getSocket().emit("getStatusPage", this.slug, (res) => {
-                    if (res.ok) {
-                        this.config = res.config;
-
-                        if (!this.config.customCSS) {
-                            this.config.customCSS = "body {\n" + "  \n" + "}\n";
-                        }
-                    } else {
-                        this.$root.toastError(res.msg);
-                    }
-                });
+                this.loadPrivateConfig();
             }
         },
 
@@ -981,7 +974,9 @@ export default {
 
         this.getData()
             .then((res) => {
-                this.config = res.data.config;
+                if (!this.privateConfigLoaded) {
+                    this.config = res.data.config;
+                }
 
                 if (!this.config.domainNameList) {
                     this.config.domainNameList = [];
@@ -1018,6 +1013,8 @@ export default {
                 );
 
                 this.updateUpdateTimer();
+                this.publicConfigLoaded = true;
+                this.finishEditLoading();
             })
             .catch(function (error) {
                 if (error.response.status === 404) {
@@ -1036,6 +1033,41 @@ export default {
         }
     },
     methods: {
+        /**
+         * Load authoritative editor settings once per page, without overwriting unsaved changes.
+         * @returns {void}
+         */
+        loadPrivateConfig() {
+            if (!this.$root.loggedIn || this.privateConfigLoaded || this.privateConfigLoading) {
+                return;
+            }
+            this.privateConfigLoading = true;
+            this.$root.getSocket().emit("getStatusPage", this.slug, (res) => {
+                this.privateConfigLoading = false;
+                if (res.ok) {
+                    this.config = res.config;
+                    if (!this.config.customCSS) {
+                        this.config.customCSS = "body {\n  \n}\n";
+                    }
+                    this.privateConfigLoaded = true;
+                    this.finishEditLoading();
+                } else {
+                    this.$root.toastError(res.msg);
+                }
+            });
+        },
+
+        /**
+         * Enable inputs only after both initial responses have settled.
+         * @returns {void}
+         */
+        finishEditLoading() {
+            if (this.clickedEditButton && this.publicConfigLoaded && this.privateConfigLoaded) {
+                this.enableEditMode = true;
+                this.loadedData = true;
+            }
+        },
+
         /**
          * Get status page data
          * It should be preloaded in window.preloadData
@@ -1118,12 +1150,10 @@ export default {
          */
         edit() {
             if (this.hasToken) {
-                this.$root.initSocketIO(true);
-                this.enableEditMode = true;
                 this.clickedEditButton = true;
-
-                // Try to fix #1658
-                this.loadedData = true;
+                this.$root.initSocketIO(true);
+                this.loadPrivateConfig();
+                this.finishEditLoading();
             }
         },
 

@@ -18,11 +18,8 @@ class SMSManager extends NotificationProvider {
                 number: notification.numbers,
                 gateway: notification.messageType,
             };
-            let config = this.getAxiosConfigWithProxy({});
-            await axios.get(
-                `${url}?apikey=${data.apikey}&message=${data.message}&number=${data.number}&gateway=${data.messageType}`,
-                config
-            );
+            let config = this.getAxiosConfigWithProxy({ params: data });
+            await axios.get(url, config);
             return okMsg;
         } catch (error) {
             this.throwGeneralAxiosError(error);

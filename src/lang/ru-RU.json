@@ -1739,5 +1739,7 @@
     "Pinglet Topic URL": "URL темы",
     "ntpStratumThreshold": "Порог стратификации",
     "pingPacketSizeWarning": "Размер пакета меньше 16 не приводит к определению времени кругового пути в Linux",
-    "Connection Timeout": "Таймаут соединения"
+    "Connection Timeout": "Таймаут соединения",
+    "SSH Host Key Fingerprint": "Отпечаток ключа SSH-сервера",
+    "sshHostKeyFingerprintHelp": "Получите отпечаток SHA256 у администратора сервера по доверенному каналу. Если ключ не указан или изменился, вход блокируется, в том числе для уже созданных проверок."
 }

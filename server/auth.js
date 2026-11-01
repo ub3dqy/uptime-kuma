@@ -78,22 +78,24 @@ async function verifyAPIKey(key) {
  */
 function apiAuthorizer(username, password, callback) {
     // API Rate Limit
-    apiRateLimiter.pass(null, 0).then((pass) => {
-        if (pass) {
-            verifyAPIKey(password).then((valid) => {
-                if (!valid) {
-                    log.warn("api-auth", "Failed API auth attempt: invalid API Key");
-                }
-                callback(null, valid);
-                // Only allow a set number of api requests per minute
-                // (currently set to 60)
-                apiRateLimiter.removeTokens(1);
-            });
-        } else {
-            log.warn("api-auth", "Failed API auth attempt: rate limit exceeded");
-            callback(null, false);
-        }
-    });
+    apiRateLimiter
+        .pass(null, 1)
+        .then((pass) => {
+            if (pass) {
+                verifyAPIKey(password)
+                    .then((valid) => {
+                        if (!valid) {
+                            log.warn("api-auth", "Failed API auth attempt: invalid API Key");
+                        }
+                        callback(null, valid);
+                    })
+                    .catch(callback);
+            } else {
+                log.warn("api-auth", "Failed API auth attempt: rate limit exceeded");
+                callback(null, false);
+            }
+        })
+        .catch(callback);
 }
 
 /**
@@ -105,21 +107,26 @@ function apiAuthorizer(username, password, callback) {
  */
 function userAuthorizer(username, password, callback) {
     // Login Rate Limit
-    loginRateLimiter.pass(null, 0).then((pass) => {
-        if (pass) {
-            exports.login(username, password).then((user) => {
-                callback(null, user != null);
+    loginRateLimiter
+        .pass(null, 1)
+        .then((pass) => {
+            if (pass) {
+                exports
+                    .login(username, password)
+                    .then((user) => {
+                        callback(null, user != null);
 
-                if (user == null) {
-                    log.warn("basic-auth", "Failed basic auth attempt: invalid username/password");
-                    loginRateLimiter.removeTokens(1);
-                }
-            });
-        } else {
-            log.warn("basic-auth", "Failed basic auth attempt: rate limit exceeded");
-            callback(null, false);
-        }
-    });
+                        if (user == null) {
+                            log.warn("basic-auth", "Failed basic auth attempt: invalid username/password");
+                        }
+                    })
+                    .catch(callback);
+            } else {
+                log.warn("basic-auth", "Failed basic auth attempt: rate limit exceeded");
+                callback(null, false);
+            }
+        })
+        .catch(callback);
 }
 
 /**

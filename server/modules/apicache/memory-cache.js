@@ -1,5 +1,5 @@
 function MemoryCache() {
-    this.cache = {};
+    this.cache = Object.create(null);
     this.size = 0;
 }
 
@@ -15,6 +15,11 @@ function MemoryCache() {
 MemoryCache.prototype.add = function (key, value, time, timeoutCallback) {
     let old = this.cache[key];
     let instance = this;
+    if (old) {
+        clearTimeout(old.timeout);
+    } else {
+        this.size++;
+    }
 
     let entry = {
         value: value,
@@ -26,7 +31,6 @@ MemoryCache.prototype.add = function (key, value, time, timeoutCallback) {
     };
 
     this.cache[key] = entry;
-    this.size = Object.keys(this.cache).length;
 
     return entry;
 };
@@ -41,11 +45,10 @@ MemoryCache.prototype.delete = function (key) {
 
     if (entry) {
         clearTimeout(entry.timeout);
+        this.size--;
     }
 
     delete this.cache[key];
-
-    this.size = Object.keys(this.cache).length;
 
     return null;
 };

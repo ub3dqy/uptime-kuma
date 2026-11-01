@@ -65,6 +65,20 @@ volume; back it up before upgrading.
 
 ## Validation of the first addition
 
+Security changes of 1 November 2026 affect upgrades:
+
+- SFTP requires a trusted `SHA256:...` server host-key fingerprint obtained
+  through a trusted channel. Existing monitors without it refuse authentication.
+  The first network response is never trusted automatically.
+- HTTP monitor responses are limited to 10 MiB after decompression. Larger
+  bodies fail the check even when response saving is disabled.
+- Every HTTP authentication attempt, including successful ones, consumes the
+  instance-wide allowance: 20 per minute for passwords and 60 for API keys.
+- RADIUS responses must have a valid authenticator and Message-Authenticator.
+  A legacy server without that protection will no longer produce an UP result.
+- The corrected legacy migration preserves Kafka TLS. Settings already lost by
+  an earlier migration cannot be reconstructed automatically; compare a backup.
+
 On 31 October 2026 the dependency tree was refreshed against current stable releases.
 Both the complete tree and production-only tree report zero npm advisories.
 Backend, browser, database and TLS results and platform limits are recorded in

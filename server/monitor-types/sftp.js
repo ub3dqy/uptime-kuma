@@ -2,6 +2,8 @@ const { MonitorType } = require("./monitor-type");
 const { UP, log } = require("../../src/util");
 const dayjs = require("dayjs");
 const SftpClient = require("ssh2-sftp-client");
+const { sshHostVerifier } = require("../utils/ssh-host-key");
+const net = require("node:net");
 
 /**
  * Converts a raw ssh2-sftp-client error into a clean, human-readable message.
@@ -46,6 +48,7 @@ class SFTPMonitorType extends MonitorType {
      * @inheritdoc
      */
     async check(monitor, heartbeat, _server) {
+        const hostVerifier = sshHostVerifier(monitor.sshHostKeyFingerprint);
         const sftp = new SftpClient();
         const host = monitor.hostname;
         const port = monitor.port || 22;
@@ -59,6 +62,7 @@ class SFTPMonitorType extends MonitorType {
             username: monitor.sshUsername,
             readyTimeout: timeoutMs,
             timeout: timeoutMs,
+            hostVerifier,
         };
 
         if (monitor.sshAuthMethod === "privateKey") {
@@ -73,13 +77,13 @@ class SFTPMonitorType extends MonitorType {
             connectOptions.password = monitor.sshPassword;
         }
 
-        let connected = false;
-
+        let socket;
         try {
             const startTime = dayjs().valueOf();
-
+            socket = net.connect({ host, port });
+            socket.on("error", () => {});
+            connectOptions.sock = socket;
             await sftp.connect(connectOptions);
-            connected = true;
             log.debug("sftp", `Connected to SFTP server: ${host}:${port}`);
 
             if (monitor.sftpPath) {
@@ -96,13 +100,13 @@ class SFTPMonitorType extends MonitorType {
         } catch (err) {
             throw new Error(formatSftpError(err, host, port));
         } finally {
-            if (connected) {
-                try {
-                    await sftp.end();
-                } catch (teardownErr) {
-                    // cleanup errors are ignored, only log them for debugging purposes
-                    log.debug("sftp", `Error during SFTP teardown: ${teardownErr.message}`);
-                }
+            try {
+                const closing = sftp.end();
+                // Do not wait for an untrusted peer to close its half of a failed connection.
+                socket?.destroy();
+                await closing;
+            } catch (teardownErr) {
+                log.debug("sftp", `Error during SFTP teardown: ${teardownErr.message}`);
             }
         }
     }

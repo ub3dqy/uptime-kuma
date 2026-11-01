@@ -19,11 +19,24 @@ router.get("/status/:slug", cache("5 minutes"), async (request, response) => {
     await StatusPage.handleStatusPageResponse(response, server.indexHTML, slug);
 });
 
-router.get("/status/:slug/rss", cache("5 minutes"), async (request, response) => {
-    let slug = request.params.slug;
-    slug = slug.toLowerCase();
-    await StatusPage.handleStatusPageRSSResponse(response, slug, request);
-});
+router.get(
+    "/status/:slug/rss",
+    cache("5 minutes", null, {
+        // RSS contains request-derived absolute links; never share them across origins.
+        appendKey: (request) =>
+            JSON.stringify([
+                request.protocol,
+                request.get("host"),
+                request.get("x-forwarded-host"),
+                request.get("x-forwarded-proto"),
+            ]),
+    }),
+    async (request, response) => {
+        let slug = request.params.slug;
+        slug = slug.toLowerCase();
+        await StatusPage.handleStatusPageRSSResponse(response, slug, request);
+    }
+);
 
 router.get("/status", cache("5 minutes"), async (request, response) => {
     let slug = "default";

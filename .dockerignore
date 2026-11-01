@@ -12,7 +12,6 @@
 **/.gitignore
 **/docker-compose*
 **/[Dd]ockerfile*
-LICENSE
 README.md
 .editorconfig
 .vscode

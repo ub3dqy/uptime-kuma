@@ -950,6 +950,7 @@ let needSetup = false;
                 bean.sshPrivateKey = monitor.sshPrivateKey;
                 bean.sshPassphrase = monitor.sshPassphrase;
                 bean.sshAuthMethod = monitor.sshAuthMethod;
+                bean.sshHostKeyFingerprint = monitor.sshHostKeyFingerprint;
                 bean.ntp_stratum_threshold = monitor.ntpStratumThreshold;
                 bean.ntp_time_offset_threshold = monitor.ntpTimeOffsetThreshold;
                 bean.ntp_root_dispersion_threshold = monitor.ntpRootDispersionThreshold;
