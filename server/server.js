@@ -202,6 +202,7 @@ const { EmbeddedMariaDB } = require("./embedded-mariadb");
 const { SetupDatabase } = require("./setup-database");
 const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler");
 const { heartbeatExportSocketHandler } = require("./socket-handlers/heartbeat-export-socket-handler");
+const { periodSummarySocketHandler } = require("./socket-handlers/period-summary-socket-handler");
 
 app.use(express.json());
 
@@ -1740,6 +1741,7 @@ let needSetup = false;
         generalSocketHandler(socket, server);
         chartSocketHandler(socket);
         heartbeatExportSocketHandler(socket);
+        periodSummarySocketHandler(socket);
 
         log.debug("server", "added all socket handlers");
 

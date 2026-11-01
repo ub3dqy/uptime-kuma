@@ -64,6 +64,9 @@ router.all("/api/push/:pushToken", async (request, response) => {
             throw new Error("Monitor not found or not active.");
         }
 
+        // Capture the run before asynchronous work; a pause/restart must break coverage.
+        const observationMonitor = server.monitorList[monitor.id];
+        const observationRun = Monitor.getObservationRun(observationMonitor);
         const previousHeartbeat = await Monitor.getPreviousHeartbeat(monitor.id);
 
         let isFirstBeat = true;
@@ -74,6 +77,8 @@ router.all("/api/push/:pushToken", async (request, response) => {
         bean.ping = ping;
         bean.msg = msg;
         bean.downCount = previousHeartbeat?.downCount || 0;
+        bean.check_interval = observationRun ? monitor.interval : null;
+        bean.check_session = observationRun ?? null;
 
         if (previousHeartbeat) {
             isFirstBeat = false;
@@ -121,6 +126,10 @@ router.all("/api/push/:pushToken", async (request, response) => {
             }
         }
 
+        if (Monitor.getObservationRun(observationMonitor) !== observationRun) {
+            bean.check_interval = null;
+            bean.check_session = null;
+        }
         await R.store(bean);
 
         io.to(monitor.user_id).emit("heartbeat", bean.toJSON());

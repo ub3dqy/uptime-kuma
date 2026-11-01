@@ -86,12 +86,47 @@ Backend, browser, database and TLS results and platform limits are recorded in
 the Linux/amd64 Docker release have passed local acceptance. A live server
 installation has not been qualified.
 
+## Period summaries
+
+Use **Calculate summary** beside the CSV button. The UTC range is half-open,
+limited to 31 days and 50,000 saved checks, and cannot end in the future.
+Access is authenticated and owner-scoped, with one summary per account at a time.
+Messages, stored response bodies and monitor configuration are never included.
+
+The summary shows UP, DOWN, PENDING and MAINTENANCE counts and estimated time,
+unknown time, observation coverage and successful-response mean, minimum,
+maximum and nearest-rank p95. Zero-millisecond responses are valid samples.
+
+Time is estimated between adjacent saved checks in the same uninterrupted run.
+The earlier state is carried forward for at most its recorded check interval;
+the remaining gap is unknown. Pauses, restarts and configuration edits break a
+run. There is no extrapolation after the final saved check. One neighboring row
+on either side clips the selected period without entering its counts or latency
+statistics. Unknown states provide no time coverage.
+
+Availability is UP time divided by UP + DOWN time. PENDING, MAINTENANCE and
+unknown time are excluded. Always read this with observation coverage, which
+includes all four recognized states over the full period. A 100% result with low
+coverage does not establish 100% availability for the full period. No accounted
+UP or DOWN time yields no availability percentage.
+
+New heartbeats save the effective interval and a private run identifier. Old
+rows intentionally remain without those fields: their counts and response
+samples are usable, but their time remains unknown. Today's settings cannot
+reconstruct historical schedules, deleted history, missed-run counts or the
+cause of a gap. These sampled estimates do not establish contractual SLA.
+
+The existing daily cleanup removes non-important rows older than 24 hours,
+retaining the most recent 100 rows per monitor. Older ranges can therefore have
+low coverage even after this update. This feature leaves retention unchanged and
+does not reconstruct missing observations from old aggregate statistics, which
+do not preserve trustworthy gap boundaries. Incomplete percentages near 100%
+are displayed as less than 100%, so rounding cannot conceal a small gap.
+
 ## Development and scope
 
 Run the relevant backend and browser tests and build the frontend before
 publishing changes. This fork receives its own changes; submitting work to the
 upstream repository requires a separate decision and its contribution rules.
 
-Next planned milestones are period summaries with explicit missing-data
-handling, client groups, and printable reports. They are not included in the
-first CSV export.
+Next planned milestones are client groups and printable reports.

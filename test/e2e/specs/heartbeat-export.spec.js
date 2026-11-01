@@ -1,6 +1,22 @@
 import { expect, test } from "@playwright/test";
 import fs from "fs/promises";
+import Database from "better-sqlite3";
 import { login } from "../util-test";
+
+const databasePath = process.env.KUMA_E2E_DB_PATH || "data/playwright-test/kuma.db";
+
+/**
+ * Pause through the same confirmation used by the owner.
+ * @param {Page} page Browser page
+ * @returns {Promise<void>}
+ */
+async function pauseMonitor(page) {
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+    await expect(page.locator(".modal.show")).toHaveCSS("opacity", "1");
+    await page.locator(".modal.show").getByRole("button", { name: "Yes", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+    await expect(page.locator(".modal.show")).toHaveCount(0);
+}
 
 /**
  * Create a monitor that checks only this isolated local test server.
@@ -100,6 +116,162 @@ test.describe("Retained history CSV", () => {
         await page
             .locator("section[aria-labelledby='export-history-title']")
             .screenshot({ path: testInfo.outputPath("history-export-russian.png") });
+    });
+
+    test("summarizes a real history gap without granting uptime and preserves run boundaries", async ({
+        page,
+        baseURL,
+    }, testInfo) => {
+        await createMonitor(page, baseURL);
+        const monitorID = Number(new URL(page.url()).pathname.split("/").at(-1));
+        // This spec runs against the isolated local database created by the Playwright webServer.
+        const db = new Database(databasePath, { fileMustExist: true });
+        db.pragma("busy_timeout = 5000");
+        try {
+            const latest = db.prepare(
+                "SELECT check_interval, check_session FROM heartbeat WHERE monitor_id = ? ORDER BY id DESC LIMIT 1"
+            );
+            await expect.poll(() => latest.get(monitorID)?.check_session).toMatch(/^[a-f0-9-]{36}$/);
+            const initial = latest.get(monitorID);
+            expect(initial.check_interval).toBe(60);
+            await pauseMonitor(page);
+            await page.getByRole("button", { name: "Resume", exact: true }).click();
+            await expect.poll(() => latest.get(monitorID)?.check_session).not.toBe(initial.check_session);
+            await pauseMonitor(page);
+            const insert =
+                db.prepare(`INSERT INTO heartbeat (monitor_id, time, status, ping, check_interval, check_session)
+                VALUES (?, ?, ?, ?, ?, ?)`);
+            db.transaction(() => {
+                for (const [minute, status, ping] of [
+                    [0, 1, 0],
+                    [1, 1, 10],
+                    [5, 0, null],
+                    [6, 0, null],
+                    [8, 1, 30],
+                    [9, 1, 40],
+                    [10, 1, 999],
+                ]) {
+                    insert.run(
+                        monitorID,
+                        `2026-01-01 00:${String(minute).padStart(2, "0")}:00.000`,
+                        status,
+                        ping,
+                        60,
+                        "fixture-run"
+                    );
+                }
+            })();
+            await page.locator("#export-history-start").fill("2026-01-01T00:00");
+            await page.locator("#export-history-end").fill("2026-01-01T00:10");
+            await page.getByRole("button", { name: "Calculate summary", exact: true }).click();
+            const summary = page.getByTestId("period-summary");
+            await expect(summary.getByTestId("summary-availability")).toHaveText("66.67%");
+            await expect(summary.getByTestId("summary-coverage")).toHaveText("60%");
+            await expect(summary.getByTestId("summary-unknown")).toContainText("4 min");
+            await expect(summary.getByTestId("summary-down")).toContainText("2 min");
+            await expect(summary.getByTestId("summary-response")).toContainText("20 ms");
+            await summary.screenshot({ path: testInfo.outputPath("period-summary-desktop.png") });
+            // A changed period must not keep showing a stale summary.
+            await page.locator("#export-history-end").fill("2026-01-01T00:09");
+            await expect(summary).toHaveCount(0);
+            await page.evaluate(() => localStorage.setItem("locale", "ru-RU"));
+            await page.reload();
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.locator("#export-history-start").fill("2026-01-01T00:00");
+            await page.locator("#export-history-end").fill("2026-01-01T00:10");
+            await page.getByRole("button", { name: "Рассчитать сводку", exact: true }).click();
+            await expect(summary.getByRole("heading", { name: "Сводка за период" })).toBeVisible();
+            await expect(summary.getByTestId("summary-coverage")).toHaveText(/60\s?%/);
+            const width = await summary.evaluate((element) => ({
+                scroll: element.scrollWidth,
+                client: element.clientWidth,
+            }));
+            expect(width.scroll).toBeLessThanOrEqual(width.client);
+            await summary.screenshot({ path: testInfo.outputPath("period-summary-russian-mobile.png") });
+        } finally {
+            db.close();
+        }
+    });
+
+    test("keeps legacy history unknown and displays an empty summary with no availability", async ({
+        page,
+        baseURL,
+    }) => {
+        await createMonitor(page, baseURL);
+        const monitorID = Number(new URL(page.url()).pathname.split("/").at(-1));
+        const db = new Database(databasePath, { fileMustExist: true });
+        try {
+            const insert = db.prepare("INSERT INTO heartbeat (monitor_id, time, status, ping) VALUES (?, ?, 1, 15)");
+            insert.run(monitorID, "2026-01-01 00:00:00.000");
+            insert.run(monitorID, "2026-01-01 00:01:00.000");
+        } finally {
+            db.close();
+        }
+        await page.locator("#export-history-start").fill("2026-01-01T00:00");
+        await page.locator("#export-history-end").fill("2026-01-01T00:10");
+        await page.getByRole("button", { name: "Calculate summary", exact: true }).click();
+        const summary = page.getByTestId("period-summary");
+        await expect(summary.getByTestId("summary-availability")).toHaveText("No data");
+        await expect(summary.getByTestId("summary-coverage")).toHaveText("0%");
+        await expect(summary.getByRole("status")).toContainText("Some checks have no saved schedule");
+        await page.locator("#export-history-start").fill("2025-12-01T00:00");
+        await page.locator("#export-history-end").fill("2025-12-01T00:10");
+        await page.getByRole("button", { name: "Calculate summary", exact: true }).click();
+        await expect(summary.getByRole("status")).toHaveText("No saved checks fall inside this period.");
+        await expect(summary.getByTestId("summary-availability")).toHaveText("No data");
+        const updated = new Database(databasePath, { fileMustExist: true });
+        try {
+            updated
+                .prepare(
+                    "UPDATE heartbeat SET check_interval = 59.999, check_session = 'tiny-gap' WHERE monitor_id = ? AND time = '2026-01-01 00:00:00.000'"
+                )
+                .run(monitorID);
+            updated
+                .prepare(
+                    "UPDATE heartbeat SET check_interval = 540, check_session = 'tiny-gap' WHERE monitor_id = ? AND time = '2026-01-01 00:01:00.000'"
+                )
+                .run(monitorID);
+            updated
+                .prepare(
+                    "INSERT INTO heartbeat (monitor_id, time, status, check_interval, check_session) VALUES (?, '2026-01-01 00:10:00.000', 1, 60, 'tiny-gap')"
+                )
+                .run(monitorID);
+        } finally {
+            updated.close();
+        }
+        await page.locator("#export-history-start").fill("2026-01-01T00:00");
+        await page.locator("#export-history-end").fill("2026-01-01T00:10");
+        await page.getByRole("button", { name: "Calculate summary", exact: true }).click();
+        await expect(summary.getByTestId("summary-coverage")).toHaveText("< 100%");
+        await expect(summary.getByTestId("summary-unknown")).toContainText("0.001 sec");
+    });
+
+    test("records push observation intervals and changes their run after a pause", async ({ page, request }) => {
+        await page.goto("./add");
+        await login(page);
+        await page.getByTestId("monitor-type-select").selectOption("push");
+        await page.getByTestId("friendly-name-input").fill("Push summary run");
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/dashboard/*");
+        const monitorID = Number(new URL(page.url()).pathname.split("/").at(-1));
+        const db = new Database(databasePath, { fileMustExist: true });
+        try {
+            const monitor = db.prepare("SELECT push_token FROM monitor WHERE id = ?").get(monitorID);
+            const latest = db.prepare(
+                "SELECT check_interval, check_session FROM heartbeat WHERE monitor_id = ? ORDER BY id DESC LIMIT 1"
+            );
+            expect((await (await request.get(`/api/push/${monitor.push_token}?ping=15`)).json()).ok).toBe(true);
+            const initial = latest.get(monitorID);
+            expect(initial.check_interval).toBe(60);
+            expect(initial.check_session).toMatch(/^[a-f0-9-]{36}$/);
+            await pauseMonitor(page);
+            await page.getByRole("button", { name: "Resume", exact: true }).click();
+            await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+            expect((await (await request.get(`/api/push/${monitor.push_token}?ping=25`)).json()).ok).toBe(true);
+            expect(latest.get(monitorID).check_session).not.toBe(initial.check_session);
+        } finally {
+            db.close();
+        }
     });
 
     test("preserves formatted descriptions while removing executable HTML", async ({ page, baseURL }) => {

@@ -65,6 +65,7 @@ const DomainExpiry = require("./domain_expiry");
 const { parseSshHostFingerprint } = require("../utils/ssh-host-key");
 
 const rootCertificates = rootCertificatesFingerprints();
+const observationRuns = new WeakMap();
 
 /**
  * status:
@@ -419,6 +420,8 @@ class Monitor extends BeanModel {
      * @returns {Promise<void>}
      */
     async start(io) {
+        const observationRun = crypto.randomUUID();
+        observationRuns.set(this, observationRun);
         let previousBeat = null;
         let retries = 0;
 
@@ -1068,6 +1071,9 @@ class Monitor extends BeanModel {
 
             // Store to database
             log.debug("monitor", `[${this.name}] Store`);
+            const uninterrupted = observationRuns.get(this) === observationRun;
+            bean.check_interval = uninterrupted ? beatInterval : null;
+            bean.check_session = uninterrupted ? observationRun : null;
             await R.store(bean);
 
             log.debug("monitor", `[${this.name}] prometheus.update`);
@@ -1218,10 +1224,20 @@ class Monitor extends BeanModel {
      * @returns {Promise<void>}
      */
     async stop() {
+        observationRuns.delete(this);
         clearTimeout(this.heartbeatInterval);
         this.isStop = true;
 
         this.prometheus?.remove();
+    }
+
+    /**
+     * Identify a live observation run without persisting runtime state on the monitor.
+     * @param {Monitor|undefined} monitor Running monitor
+     * @returns {string|undefined} Session, invalidated on pause or restart
+     */
+    static getObservationRun(monitor) {
+        return monitor && observationRuns.get(monitor);
     }
 
     /**
