@@ -123,10 +123,44 @@ does not reconstruct missing observations from old aggregate statistics, which
 do not preserve trustworthy gap boundaries. Incomplete percentages near 100%
 are displayed as less than 100%, so rounding cannot conceal a small gap.
 
+## Client groups and printable reports
+
+Open **Clients** in the desktop header or the mobile settings menu. Create a
+named group and select individual owned checks. One check may belong to several
+clients. Upstream monitor groups remain unchanged; their descendants are not
+expanded automatically. These groups organize this account's checks and do not
+create client accounts or grant access.
+
+For a saved group, select a UTC period and **Open period report**. The aggregate
+adds monitor-time: three checks over one day have a three-day denominator.
+Availability uses summed UP / (UP + DOWN) time, rather than an average of
+per-monitor percentages. Coverage and unknown time remain explicit. Response
+statistics, including p95, are shown separately for each check.
+
+**Print / save PDF** opens the browser print dialog. The standalone report prints
+the client name, UTC period, preparation time, membership revision, totals and
+per-check results without application navigation or controls. Check names are
+included; inspect the document before sharing. The report URL requires login
+and is not a public sharing link. The printed snapshot stays unchanged after
+later membership edits.
+
+Reports use current saved membership, not historical client assignments. A
+membership revision prevents stale editors from silently overwriting changes;
+stale report URLs require refreshing the client list. If saving loses its
+acknowledgement, refresh before retrying. Deleting a group preserves its checks
+and history. Deleting a monitor removes its memberships through foreign keys.
+
+Limits are 100 clients per account, 100 checks per client, 31 days and a single
+50,000-row in-period history budget for the entire report. Exceeding a limit
+fails the whole report, with no partial result. Empty clients have no availability
+percentage. Messages, settings, credentials and saved response bodies are not
+included. The existing history retention and missing-data limitations still apply.
+
 ## Development and scope
 
 Run the relevant backend and browser tests and build the frontend before
 publishing changes. This fork receives its own changes; submitting work to the
 upstream repository requires a separate decision and its contribution rules.
 
-Next planned milestones are client groups and printable reports.
+Client groups and printable reports are implemented. A sustained trial on the
+chosen permanent server remains separate deployment qualification.

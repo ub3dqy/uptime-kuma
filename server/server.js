@@ -203,6 +203,7 @@ const { SetupDatabase } = require("./setup-database");
 const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler");
 const { heartbeatExportSocketHandler } = require("./socket-handlers/heartbeat-export-socket-handler");
 const { periodSummarySocketHandler } = require("./socket-handlers/period-summary-socket-handler");
+const { clientGroupSocketHandler } = require("./socket-handlers/client-group-socket-handler");
 
 app.use(express.json());
 
@@ -1742,6 +1743,7 @@ let needSetup = false;
         chartSocketHandler(socket);
         heartbeatExportSocketHandler(socket);
         periodSummarySocketHandler(socket);
+        clientGroupSocketHandler(socket);
 
         log.debug("server", "added all socket handlers");
 

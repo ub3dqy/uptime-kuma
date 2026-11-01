@@ -9,6 +9,8 @@ import EditMonitor from "./pages/EditMonitor.vue";
 import EditMaintenance from "./pages/EditMaintenance.vue";
 import List from "./pages/List.vue";
 const Settings = () => import("./pages/Settings.vue");
+const Clients = () => import("./pages/Clients.vue");
+const ClientReport = () => import("./pages/ClientReport.vue");
 import Setup from "./pages/Setup.vue";
 import StatusPage from "./pages/StatusPage.vue";
 import Entry from "./pages/Entry.vue";
@@ -142,6 +144,10 @@ const routes = [
                         component: ManageStatusPage,
                     },
                     {
+                        path: "/clients",
+                        component: Clients,
+                    },
+                    {
                         path: "/add-status-page",
                         component: AddStatusPage,
                     },
@@ -164,6 +170,11 @@ const routes = [
                 ],
             },
         ],
+    },
+    {
+        name: "ClientReport",
+        path: "/client-report/:id",
+        component: ClientReport,
     },
     {
         path: "/setup",

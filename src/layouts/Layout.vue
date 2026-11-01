@@ -34,6 +34,12 @@
 
             <ul class="nav nav-pills">
                 <li v-if="$root.loggedIn" class="nav-item me-2">
+                    <router-link to="/clients" class="nav-link">
+                        <font-awesome-icon icon="folder" />
+                        {{ $t("clientGroupsTitle") }}
+                    </router-link>
+                </li>
+                <li v-if="$root.loggedIn" class="nav-item me-2">
                     <router-link to="/manage-status-page" class="nav-link">
                         <font-awesome-icon icon="stream" />
                         {{ $t("Status Pages") }}

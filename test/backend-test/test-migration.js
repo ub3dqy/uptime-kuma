@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { GenericContainer, Wait } = require("testcontainers");
 const { MySqlContainer } = require("@testcontainers/mysql");
+const checkClientGroups = require("./client-group-database-check.cjs");
 
 describe("Database Migration", () => {
     test("SQLite migrations run successfully from fresh database", async () => {
@@ -46,7 +47,7 @@ describe("Database Migration", () => {
                 directory: path.join(__dirname, "../../db/knex_migrations"),
             });
 
-            // Test passes if migrations complete successfully without errors
+            await checkClientGroups();
         } finally {
             // Clean up
             await R.knex.destroy();
@@ -87,6 +88,7 @@ describe("Database Migration", () => {
                     user: "kuma",
                     password: "kuma",
                     database: "kuma_test",
+                    timezone: "Z",
                     connectTimeout: 60000,
                 },
                 pool: {
@@ -111,7 +113,7 @@ describe("Database Migration", () => {
                     directory: path.join(__dirname, "../../db/knex_migrations"),
                 });
 
-                // Test passes if migrations complete successfully without errors
+                await checkClientGroups();
             } finally {
                 // Clean up
                 try {
@@ -150,6 +152,7 @@ describe("Database Migration", () => {
                     user: mysqlContainer.getUsername(),
                     password: mysqlContainer.getUserPassword(),
                     database: mysqlContainer.getDatabase(),
+                    timezone: "Z",
                     connectTimeout: 60000,
                 },
                 pool: {
@@ -174,7 +177,7 @@ describe("Database Migration", () => {
                     directory: path.join(__dirname, "../../db/knex_migrations"),
                 });
 
-                // Test passes if migrations complete successfully without errors
+                await checkClientGroups();
             } finally {
                 // Clean up
                 try {

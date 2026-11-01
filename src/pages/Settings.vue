@@ -1,6 +1,10 @@
 <template>
     <div>
         <div v-if="$root.isMobile" class="shadow-box mb-3">
+            <router-link to="/clients" class="nav-link">
+                <font-awesome-icon icon="folder" />
+                {{ $t("clientGroupsTitle") }}
+            </router-link>
             <router-link to="/manage-status-page" class="nav-link">
                 <font-awesome-icon icon="stream" />
                 {{ $t("Status Pages") }}

@@ -40,7 +40,7 @@
                         <td>—</td>
                     </tr>
                     <tr>
-                        <th scope="row">{{ $t("periodSummaryTotal") }}</th>
+                        <th scope="row">{{ $t(totalLabel) }}</th>
                         <td>{{ duration(summary.time.total) }}</td>
                         <td>{{ summary.counts.total }}</td>
                     </tr>
@@ -48,8 +48,8 @@
             </table>
         </div>
         <p class="small">{{ $t("periodSummaryGapHelp") }}</p>
-        <h4 class="h6">{{ $t("periodSummaryResponse") }}</h4>
-        <dl class="row gx-0 mb-0" data-testid="summary-response">
+        <h4 v-if="showResponse" class="h6">{{ $t("periodSummaryResponse") }}</h4>
+        <dl v-if="showResponse" class="row gx-0 mb-0" data-testid="summary-response">
             <dt class="col-7 col-sm-8">{{ $t("periodSummarySamples") }}</dt>
             <dd class="col-5 col-sm-4">{{ summary.response.samples }}</dd>
             <template v-for="metric in metrics" :key="metric">
@@ -61,67 +61,20 @@
 </template>
 
 <script>
+import periodSummary from "../mixins/period-summary";
+
 export default {
+    mixins: [periodSummary],
     props: {
         summary: { type: Object, required: true },
+        showResponse: { type: Boolean, default: true },
+        totalLabel: { type: String, default: "periodSummaryTotal" },
     },
     data() {
         return {
             states: ["up", "down", "pending", "maintenance"],
             metrics: ["mean", "min", "max", "p95"],
         };
-    },
-    methods: {
-        /**
-         * @param {number|null} value Ratio
-         * @returns {string} Localized percentage
-         */
-        percent(value) {
-            if (value === null) {
-                return this.$t("periodSummaryUnavailable");
-            }
-            const options = { style: "percent", maximumFractionDigits: 2 };
-            // Rounding must not turn a small gap into complete coverage or availability.
-            if (value < 1 && value >= 0.99995) {
-                return "< " + this.$n(1, options);
-            }
-            if (value > 0 && value < 0.0001) {
-                return "< " + this.$n(0.0001, options);
-            }
-            return this.$n(value, options);
-        },
-        /**
-         * @param {number} value Milliseconds
-         * @returns {string} Duration without rounding small gaps away
-         */
-        duration(value) {
-            let remaining = value;
-            const parts = [];
-            for (const [unit, divisor] of [
-                ["day", 86400000],
-                ["hour", 3600000],
-                ["minute", 60000],
-                ["second", 1000],
-            ]) {
-                const amount = unit === "second" ? remaining / divisor : Math.floor(remaining / divisor);
-                if (amount > 0 || (unit === "second" && parts.length === 0)) {
-                    parts.push(
-                        this.$n(amount, { style: "unit", unit, unitDisplay: "short", maximumFractionDigits: 3 })
-                    );
-                }
-                remaining -= Math.floor(remaining / divisor) * divisor;
-            }
-            return parts.join(" ");
-        },
-        /**
-         * @param {number|null} value Milliseconds
-         * @returns {string} Localized latency or no-data marker
-         */
-        milliseconds(value) {
-            return value === null
-                ? this.$t("periodSummaryUnavailable")
-                : this.$t("periodSummaryMilliseconds", { value: this.$n(value, { maximumFractionDigits: 2 }) });
-        },
     },
 };
 </script>
