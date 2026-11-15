@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "localConfig": "/etc/uptime-kuma/site-work-sources.json",
+    "remote": null,
+    "bindings": [
+        { "origin": "local", "sourceID": "shop", "monitorID": 4, "ownerID": 1, "siteHost": "shop.example.test" },
+        { "origin": "local", "sourceID": "shop", "monitorID": 12, "ownerID": 1, "siteHost": "shop.example.test" },
+        { "origin": "local", "sourceID": "company", "monitorID": 6, "ownerID": 1, "siteHost": "company.example.test" }
+    ],
+    "output": "/srv/uptime-kuma-pilot/data/site-work.json"
+}

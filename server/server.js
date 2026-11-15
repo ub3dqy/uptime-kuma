@@ -202,6 +202,18 @@ const { EmbeddedMariaDB } = require("./embedded-mariadb");
 const { SetupDatabase } = require("./setup-database");
 const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler");
 const { heartbeatExportSocketHandler } = require("./socket-handlers/heartbeat-export-socket-handler");
+const { periodSummarySocketHandler } = require("./socket-handlers/period-summary-socket-handler");
+const { clientGroupSocketHandler } = require("./socket-handlers/client-group-socket-handler");
+const { deliverySocketHandler } = require("./socket-handlers/delivery-socket-handler");
+const { queue: deliveryQueue } = require("./notification-delivery");
+const { installProjectGate } = require("./projects/access");
+const { projectSocketHandler } = require("./socket-handlers/project-socket-handler");
+const { worker: projectAIWorker } = require("./projects/ai-service");
+const { worker: projectRecoveryWorker } = require("./projects/recovery");
+const { worker: projectAutomationWorker } = require("./projects/ai-automation");
+const { ensurePersonalProject } = require("./projects/store");
+const telegramControl = require("./telegram-control");
+const monitorSyncs = new Map();
 
 app.use(express.json());
 
@@ -241,6 +253,15 @@ let needSetup = false;
 
     // Database should be ready now
     await server.initAfterDatabaseReady();
+    await require("./projects/vault").initializeVaultState(R.knex);
+    await deliveryQueue.start();
+    await projectAIWorker.start();
+    await projectAutomationWorker.start();
+    try {
+        await projectRecoveryWorker.start();
+    } catch {
+        log.error("recovery", "Approved recovery is unavailable; monitoring remains enabled.");
+    }
     server.entryPage = await Settings.get("entryPage");
     await StatusPage.loadDomainMappingList();
 
@@ -364,6 +385,8 @@ let needSetup = false;
     // API Router
     const apiRouter = require("./routers/api-router");
     app.use(apiRouter);
+    app.use(require("./routers/project-ai-router"));
+    app.use(require("./independent-witness").router());
 
     // Status Page Router
     const statusPageRouter = require("./routers/status-page-router");
@@ -380,6 +403,7 @@ let needSetup = false;
 
     log.debug("server", "Adding socket handler");
     io.on("connection", async (socket) => {
+        installProjectGate(socket);
         await sendInfo(socket, true);
 
         if (needSetup) {
@@ -401,11 +425,11 @@ let needSetup = false;
 
                 log.info("auth", "Username from JWT: " + decoded.username);
 
-                let user = await R.findOne("user", " username = ? AND active = 1 ", [decoded.username]);
+                let user = await require("./auth").findHumanByUsername(decoded.username);
 
                 if (user) {
                     // Check if the password changed
-                    if (decoded.h !== shake256(user.password, SHAKE256_LENGTH)) {
+                    if (decoded.h !== shake256(require("./auth").passwordFor(user), SHAKE256_LENGTH)) {
                         throw new Error("The token is invalid due to password change or old token");
                     }
 
@@ -527,7 +551,15 @@ let needSetup = false;
             }
 
             socket.leave(socket.userID);
+            const previousUserID = socket.userID;
+            socket.projectGeneration = (socket.projectGeneration || 0) + 1;
             socket.userID = null;
+            if (previousUserID) {
+                await R.knex("project_oauth_pairing")
+                    .where({ user_id: previousUserID })
+                    .whereNull("used_at")
+                    .update({ used_at: Date.now() });
+            }
 
             if (typeof callback === "function") {
                 callback();
@@ -543,7 +575,7 @@ let needSetup = false;
                 checkLogin(socket);
                 await doubleCheckPassword(socket, currentPassword);
 
-                let user = await R.findOne("user", " id = ? AND active = 1 ", [socket.userID]);
+                let user = await require("./auth").findHumanByID(socket.userID);
 
                 if (user.twofa_status === 0) {
                     let newSecret = genSecret();
@@ -557,6 +589,7 @@ let needSetup = false;
                     let uri = `otpauth://totp/Uptime%20Kuma:${user.username}?secret=${encodedSecret}`;
 
                     await R.exec("UPDATE `user` SET twofa_secret = ? WHERE id = ? ", [newSecret, socket.userID]);
+                    socket.twoFAConfirmation = null;
 
                     callback({
                         ok: true,
@@ -586,9 +619,20 @@ let needSetup = false;
                 }
 
                 checkLogin(socket);
-                await doubleCheckPassword(socket, currentPassword);
-
+                const user = await doubleCheckPassword(socket, currentPassword);
+                const proof = socket.twoFAConfirmation;
+                if (
+                    !user.twofa_secret ||
+                    !proof ||
+                    proof.userID !== user.id ||
+                    proof.generation !== socket.projectGeneration ||
+                    proof.expiresAt <= Date.now() ||
+                    proof.secret !== shake256(user.twofa_secret, SHAKE256_LENGTH)
+                ) {
+                    throw new TranslatableError("projectTwoFAVerifyFirst");
+                }
                 await R.exec("UPDATE `user` SET twofa_status = 1 WHERE id = ? ", [socket.userID]);
+                socket.twoFAConfirmation = null;
 
                 log.info("auth", `Saved 2FA token. IP=${clientIP}`);
 
@@ -641,11 +685,17 @@ let needSetup = false;
                 checkLogin(socket);
                 await doubleCheckPassword(socket, currentPassword);
 
-                let user = await R.findOne("user", " id = ? AND active = 1 ", [socket.userID]);
+                let user = await require("./auth").findHumanByID(socket.userID);
 
                 let verify = notp.totp.verify(token, user.twofa_secret, twoFAVerifyOptions);
 
                 if (user.twofa_last_token !== token && verify) {
+                    socket.twoFAConfirmation = {
+                        userID: user.id,
+                        generation: socket.projectGeneration,
+                        secret: shake256(user.twofa_secret, SHAKE256_LENGTH),
+                        expiresAt: Date.now() + 300000,
+                    };
                     callback({
                         ok: true,
                         valid: true,
@@ -670,7 +720,7 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                let user = await R.findOne("user", " id = ? AND active = 1 ", [socket.userID]);
+                let user = await require("./auth").findHumanByID(socket.userID);
 
                 if (user.twofa_status === 1) {
                     callback({
@@ -803,6 +853,7 @@ let needSetup = false;
                 callback({
                     ok: false,
                     msg: e.message,
+                    msgi18n: !!e.msgi18n,
                 });
             }
         });
@@ -853,6 +904,7 @@ let needSetup = false;
                 bean.basic_auth_pass = monitor.basic_auth_pass;
                 bean.bearer_token = monitor.bearer_token;
                 bean.timeout = monitor.timeout;
+                bean.max_response_time = monitor.max_response_time ?? null;
                 bean.oauth_client_id = monitor.oauth_client_id;
                 bean.oauth_client_secret = monitor.oauth_client_secret;
                 bean.oauth_auth_method = monitor.oauth_auth_method;
@@ -987,6 +1039,7 @@ let needSetup = false;
                 callback({
                     ok: false,
                     msg: e.message,
+                    msgi18n: !!e.msgi18n,
                 });
             }
         });
@@ -1455,6 +1508,12 @@ let needSetup = false;
                 }
 
                 let user = await doubleCheckPassword(socket, password.currentPassword);
+                if (
+                    user.project_only &&
+                    (password.newPassword.length < 12 || Buffer.byteLength(password.newPassword) > 72)
+                ) {
+                    throw new TranslatableError("projectPasswordInvalid");
+                }
                 await user.resetPassword(password.newPassword);
 
                 server.disconnectAllSocketClients(user.id, socket.id);
@@ -1500,6 +1559,9 @@ let needSetup = false;
                 checkLogin(socket);
 
                 // If currently is disabled auth, don't need to check
+                if (data.disableAuth && (await R.knex("project").first())) {
+                    throw new TranslatableError("projectAuthRequired");
+                }
                 // Disabled Auth + Want to Disable Auth => No Check
                 // Disabled Auth + Want to Enable Auth => No Check
                 // Enabled Auth + Want to Disable Auth => Check!!
@@ -1600,8 +1662,15 @@ let needSetup = false;
         });
 
         socket.on("testNotification", async (notification, callback) => {
+            if (typeof callback !== "function") {
+                return;
+            }
             try {
                 checkLogin(socket);
+
+                if (notification?.managedDelivery === true) {
+                    throw new TranslatableError("stage2UseSavedChannelTest");
+                }
 
                 let msg = await Notification.send(notification, notification.name + " Testing");
 
@@ -1615,6 +1684,7 @@ let needSetup = false;
                 callback({
                     ok: false,
                     msg: e.message,
+                    msgi18n: !!e.msgi18n,
                 });
             }
         });
@@ -1740,6 +1810,15 @@ let needSetup = false;
         generalSocketHandler(socket, server);
         chartSocketHandler(socket);
         heartbeatExportSocketHandler(socket);
+        periodSummarySocketHandler(socket);
+        clientGroupSocketHandler(socket);
+        deliverySocketHandler(socket, sendNotificationList);
+        projectSocketHandler(socket, {
+            localSignIn: process.env.UPTIME_KUMA_LOCAL_OAUTH === "1" && hostname === "127.0.0.1",
+            baseURL: async () =>
+                hostname === "127.0.0.1" ? `http://127.0.0.1:${port}` : await Settings.get("primaryBaseURL"),
+            syncMonitor: syncSavedMonitor,
+        });
 
         log.debug("server", "added all socket handlers");
 
@@ -1776,6 +1855,12 @@ let needSetup = false;
         // Put this here. Start background jobs after the db and server is ready to prevent clear up during db migration.
         await initBackgroundJobs();
 
+        if (!testMode) {
+            telegramControl.start({
+                sync: syncTelegramChange,
+                isUnderMaintenance: (id) => server.getMaintenance(id)?.isUnderMaintenance(),
+            });
+        }
         checkVersion.startInterval();
     });
 
@@ -1826,10 +1911,31 @@ async function checkOwner(userID, monitorID) {
  * @returns {Promise<void>}
  */
 async function afterLogin(socket, user) {
+    if (socket.userID) {
+        socket.leave(socket.userID);
+    }
+    socket.projectGeneration = (socket.projectGeneration || 0) + 1;
     socket.userID = user.id;
+    const generation = socket.projectGeneration;
+    await ensurePersonalProject(user.id);
+    if (socket.userID !== user.id || socket.projectGeneration !== generation || socket.disconnected) {
+        return;
+    }
+    socket.emit("projectAccess", {
+        actorID: user.id,
+        projectOnly: Boolean(user.project_only),
+        installationAdmin: !user.project_only,
+    });
+    if (user.project_only) {
+        // Participants do not join legacy raw configuration/heartbeat rooms.
+        return;
+    }
     socket.join(user.id);
 
     let monitorList = await server.sendMonitorList(socket);
+    if (socket.userID !== user.id || socket.projectGeneration !== generation || socket.disconnected) {
+        return;
+    }
     await Promise.allSettled([
         sendInfo(socket),
         server.sendMaintenanceList(socket),
@@ -1841,7 +1947,13 @@ async function afterLogin(socket, user) {
         sendMonitorTypeList(socket),
     ]);
 
+    if (socket.userID !== user.id || socket.projectGeneration !== generation || socket.disconnected) {
+        return;
+    }
     await StatusPage.sendStatusPageList(io, socket);
+    if (socket.userID !== user.id || socket.projectGeneration !== generation || socket.disconnected) {
+        return;
+    }
 
     const monitorPromises = [];
     for (let monitorID in monitorList) {
@@ -1905,14 +2017,49 @@ async function startMonitor(userID, monitorID) {
 
     await R.exec("UPDATE monitor SET active = 1 WHERE id = ? AND user_id = ? ", [monitorID, userID]);
 
-    let monitor = await R.findOne("monitor", " id = ? ", [monitorID]);
+    await syncSavedMonitor(userID, monitorID, true);
+}
 
-    if (monitor.id in server.monitorList) {
-        await server.monitorList[monitor.id].stop();
+/**
+ * Reconcile the current saved state and serialize runtime changes to the same monitor.
+ * @param {number} userID Data owner
+ * @param {number} monitorID Saved check
+ * @param {boolean} restart Reload even an already running monitor after an explicit start or edit
+ * @returns {Promise<void>}
+ */
+async function syncSavedMonitor(userID, monitorID, restart = false) {
+    const key = Number(monitorID);
+    const previous = monitorSyncs.get(key);
+    const sync = (async () => {
+        await previous?.catch(() => {});
+        const monitor = await R.findOne("monitor", " id = ? AND user_id = ? ", [monitorID, userID]);
+        if (!monitor) {
+            return;
+        }
+
+        const running = server.monitorList[monitor.id];
+        if (!monitor.active) {
+            if (running) {
+                await running.stop();
+                running.active = 0;
+            }
+        } else if (restart || !Monitor.getObservationRun(running)) {
+            await running?.stop();
+            if (running && server.monitorList[monitor.id] !== running) {
+                return;
+            }
+            server.monitorList[monitor.id] = monitor;
+            await monitor.start(io);
+        }
+    })();
+    monitorSyncs.set(key, sync);
+    try {
+        await sync;
+    } finally {
+        if (monitorSyncs.get(key) === sync) {
+            monitorSyncs.delete(key);
+        }
     }
-
-    server.monitorList[monitor.id] = monitor;
-    await monitor.start(io);
 }
 
 /**
@@ -1938,10 +2085,30 @@ async function pauseMonitor(userID, monitorID) {
 
     await R.exec("UPDATE monitor SET active = 0 WHERE id = ? AND user_id = ? ", [monitorID, userID]);
 
-    if (monitorID in server.monitorList) {
-        await server.monitorList[monitorID].stop();
-        server.monitorList[monitorID].active = 0;
+    await syncSavedMonitor(userID, monitorID);
+}
+
+/**
+ * Apply the same runtime controls used by the panel, without rewriting the confirmed change.
+ * @param {object} change Saved and audited Telegram action
+ * @returns {Promise<void>}
+ */
+async function syncTelegramChange(change) {
+    const { ownerID, monitorID, maintenanceID } = change;
+    apicache.clear();
+    if (maintenanceID) {
+        const window = await R.findOne("maintenance", "id = ? AND user_id = ?", [maintenanceID, ownerID]);
+        server.maintenanceList[maintenanceID]?.stop();
+        if (window) {
+            server.maintenanceList[maintenanceID] = window;
+        } else {
+            delete server.maintenanceList[maintenanceID];
+        }
+        await server.sendMaintenanceListByUserID(ownerID);
+        return;
     }
+    await syncSavedMonitor(ownerID, monitorID);
+    await server.sendUpdateMonitorIntoList({ userID: ownerID }, monitorID);
 }
 
 /**
@@ -1976,7 +2143,13 @@ async function shutdownFunction(signal) {
     log.info("server", "Shutdown requested");
     log.info("server", "Called signal: " + signal);
 
+    await telegramControl.stop();
     await server.stop();
+    require("./projects/subscription").closeListeners();
+    await projectAutomationWorker.stop();
+    await projectAIWorker.stop();
+    await projectRecoveryWorker.stop();
+    await deliveryQueue.stop();
 
     log.info("server", "Stopping all monitors");
     for (let id in server.monitorList) {

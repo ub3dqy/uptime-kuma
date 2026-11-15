@@ -1,5 +1,13 @@
 const dayjs = require("dayjs");
 const axios = require("axios");
+const { responseTimeLimit, enforceResponseTime } = require("../response-time-policy");
+const { queue: deliveryQueue, monitorMessage } = require("../notification-delivery");
+const { Settings } = require("../settings");
+const { serviceHost } = require("../../src/overview-state.ts");
+const { workFromBeat, workMessage } = require("../../src/site-work.ts");
+const { signalForMonitor } = require("../site-work");
+const { readNotificationConfig } = require("../notification-config");
+const pendingManagedAlerts = new WeakMap();
 const { setTimeout, clearTimeout } = require("unlimited-timeout");
 const { Prometheus } = require("../prometheus");
 const {
@@ -65,6 +73,7 @@ const DomainExpiry = require("./domain_expiry");
 const { parseSshHostFingerprint } = require("../utils/ssh-host-key");
 
 const rootCertificates = rootCertificatesFingerprints();
+const observationRuns = new WeakMap();
 
 /**
  * status:
@@ -160,6 +169,7 @@ class Monitor extends BeanModel {
             packetSize: this.packetSize,
             maxredirects: this.maxredirects,
             accepted_statuscodes: this.getAcceptedStatuscodes(),
+            max_response_time: this.max_response_time ?? null,
             dns_resolve_type: this.dns_resolve_type,
             dns_resolve_server: this.dns_resolve_server,
             dns_last_result: this.dns_last_result,
@@ -419,7 +429,10 @@ class Monitor extends BeanModel {
      * @returns {Promise<void>}
      */
     async start(io) {
+        const observationRun = crypto.randomUUID();
+        observationRuns.set(this, observationRun);
         let previousBeat = null;
+        let pendingWorkEnd = null;
         let retries = 0;
 
         this.rootCertificates = rootCertificates;
@@ -452,6 +465,16 @@ class Monitor extends BeanModel {
                 previousBeat = await R.findOne("heartbeat", " monitor_id = ? ORDER BY time DESC", [this.id]);
                 if (previousBeat) {
                     retries = previousBeat.retries;
+                    if (previousBeat.status === PENDING && !pendingWorkEnd) {
+                        const recent = await R.knex("heartbeat")
+                            .where({ monitor_id: this.id })
+                            .where("time", "<=", previousBeat.time)
+                            .orderBy("time", "desc")
+                            .orderBy("id", "desc")
+                            .limit(102)
+                            .select("status", "msg");
+                        pendingWorkEnd = workFromBeat(recent.find((beat) => beat.status !== PENDING));
+                    }
                 }
             }
 
@@ -473,9 +496,12 @@ class Monitor extends BeanModel {
                 this.timeout = this.interval * 1000 * 0.8;
             }
 
+            let workSignal = null;
             try {
-                if (await Monitor.isUnderMaintenance(this.id)) {
-                    bean.msg = "Monitor under maintenance";
+                const projectNetwork = await require("../projects/network-policy").policyForOwner(this.user_id);
+                workSignal = await signalForMonitor(this);
+                if (workSignal?.state === "active" || (await Monitor.isUnderMaintenance(this.id))) {
+                    bean.msg = workSignal?.state === "active" ? workMessage(workSignal.work) : "Monitor under maintenance";
                     bean.status = MAINTENANCE;
                 } else if (this.type === "http" || this.type === "keyword" || this.type === "json-query") {
                     // Do not do any queries/high loading things before the "bean.ping"
@@ -538,6 +564,12 @@ class Monitor extends BeanModel {
                         autoSelectFamily: true,
                         ...(agentFamily ? { family: agentFamily } : {}),
                     };
+                    if (projectNetwork) {
+                        const target = new URL(this.url);
+                        projectNetwork.checkLiteral(target.hostname);
+                        httpAgentOptions.lookup = projectNetwork.lookup.bind(projectNetwork);
+                        httpsAgentOptions.lookup = projectNetwork.lookup.bind(projectNetwork);
+                    }
 
                     log.debug("monitor", `[${this.name}] Prepare Options for axios`);
 
@@ -580,6 +612,11 @@ class Monitor extends BeanModel {
                         },
                         signal: axiosAbortSignal((this.timeout + 10) * 1000),
                     };
+                    if (projectNetwork) {
+                        options.proxy = false;
+                        options.maxContentLength = 1048576;
+                        options.beforeRedirect = (redirect) => projectNetwork.checkLiteral(redirect.hostname);
+                    }
 
                     if (bodyValue) {
                         options.data = bodyValue;
@@ -657,6 +694,8 @@ class Monitor extends BeanModel {
 
                     bean.msg = `${res.status} - ${res.statusText}`;
                     bean.ping = dayjs().valueOf() - startTime;
+
+                    enforceResponseTime(this.max_response_time, bean.ping);
 
                     // in the frontend, the save response is only shown if the saveErrorResponse is set
                     if (this.getSaveResponse() && this.getSaveErrorResponse()) {
@@ -965,16 +1004,30 @@ class Monitor extends BeanModel {
             bean.retries = retries;
 
             log.debug("monitor", `[${this.name}] Check isImportant`);
-            let isImportant = Monitor.isImportantBeat(isFirstBeat, previousBeat?.status, bean.status);
+            const previousWork = workFromBeat(previousBeat) || pendingWorkEnd;
+            const currentWork = workFromBeat(bean);
+            const workStarted = Boolean(currentWork && previousWork?.runID !== currentWork.runID);
+            const workEnded = Boolean(previousWork && !currentWork && [UP, DOWN].includes(bean.status));
+            if (previousWork && !currentWork && bean.status === PENDING) pendingWorkEnd = previousWork;
+            else if (workEnded || currentWork) pendingWorkEnd = null;
+            let workContext = null;
+            if (workStarted) workContext = { event: "started", work: currentWork };
+            else if (workEnded) {
+                let event = "signal_lost";
+                if (workSignal?.state === "idle") event = "finished";
+                else if (workSignal?.state === "overdue") event = "overdue";
+                workContext = { event, work: previousWork };
+            }
+            let isImportant = Monitor.isImportantBeat(isFirstBeat, previousBeat?.status, bean.status) || workStarted || workEnded;
 
             // Mark as important if status changed, ignore pending pings,
             // Don't notify if disrupted changes to up
             if (isImportant) {
                 bean.important = true;
 
-                if (Monitor.isImportantForNotification(isFirstBeat, previousBeat?.status, bean.status)) {
+                if (workContext || Monitor.isImportantForNotification(isFirstBeat, previousBeat?.status, bean.status)) {
                     log.debug("monitor", `[${this.name}] sendNotification`);
-                    await Monitor.sendNotification(isFirstBeat, this, bean);
+                    await Monitor.sendNotification(isFirstBeat, this, bean, workContext);
                 } else {
                     log.debug(
                         "monitor",
@@ -1014,9 +1067,10 @@ class Monitor extends BeanModel {
                     const supportInfo = await DomainExpiry.checkSupport(this);
                     const domainExpiryDate = await DomainExpiry.checkExpiry(supportInfo.domain);
                     if (domainExpiryDate) {
-                        DomainExpiry.sendNotifications(
+                        await DomainExpiry.sendNotifications(
                             supportInfo.domain,
-                            (await Monitor.getNotificationList(this)) || []
+                            (await Monitor.getNotificationList(this)) || [],
+                            this
                         );
                     } else {
                         log.debug("monitor", `Failed getting expiration date for domain ${supportInfo.domain}`);
@@ -1061,14 +1115,20 @@ class Monitor extends BeanModel {
             let endTimeDayjs = await uptimeCalculator.update(bean.status, parseFloat(bean.ping));
             bean.end_time = R.isoDateTimeMillis(endTimeDayjs);
 
-            // Send to frontend
-            log.debug("monitor", `[${this.name}] Send to socket`);
-            io.to(this.user_id).emit("heartbeat", bean.toJSON());
-            Monitor.sendStats(io, this.id, this.user_id);
+            // Include the same continuity evidence in live events and saved history.
+            const uninterrupted = observationRuns.get(this) === observationRun;
+            bean.check_interval = uninterrupted ? beatInterval : null;
+            bean.check_session = uninterrupted ? observationRun : null;
 
             // Store to database
             log.debug("monitor", `[${this.name}] Store`);
             await R.store(bean);
+
+            // A displayed saved observation must already exist in retained history.
+            await Monitor.flushManagedNotifications(this, bean);
+            log.debug("monitor", `[${this.name}] Send to socket`);
+            io.to(this.user_id).emit("heartbeat", bean.toJSON());
+            Monitor.sendStats(io, this.id, this.user_id);
 
             log.debug("monitor", `[${this.name}] prometheus.update`);
             const data24h = uptimeCalculator.get24Hour();
@@ -1218,10 +1278,20 @@ class Monitor extends BeanModel {
      * @returns {Promise<void>}
      */
     async stop() {
+        observationRuns.delete(this);
         clearTimeout(this.heartbeatInterval);
         this.isStop = true;
 
         this.prometheus?.remove();
+    }
+
+    /**
+     * Identify a live observation run without persisting runtime state on the monitor.
+     * @param {Monitor|undefined} monitor Running monitor
+     * @returns {string|undefined} Session, invalidated on pause or restart
+     */
+    static getObservationRun(monitor) {
+        return monitor && observationRuns.get(monitor);
     }
 
     /**
@@ -1456,10 +1526,11 @@ class Monitor extends BeanModel {
      * @param {boolean} isFirstBeat Is this beat the first of this monitor?
      * @param {Monitor} monitor The monitor to send a notification about
      * @param {import("./heartbeat")} bean Status information about monitor
+     * @param {object|null} workContext Trusted work transition, never a remote error message
      * @returns {Promise<void>}
      */
-    static async sendNotification(isFirstBeat, monitor, bean) {
-        if (!isFirstBeat || bean.status === DOWN) {
+    static async sendNotification(isFirstBeat, monitor, bean, workContext = null) {
+        if (!isFirstBeat || bean.status === DOWN || workContext) {
             const notificationList = await Monitor.getNotificationList(monitor);
 
             let text;
@@ -1513,9 +1584,22 @@ class Monitor extends BeanModel {
 
             for (let notification of notificationList) {
                 try {
+                    const config = readNotificationConfig(notification);
+                    if (config.managedDelivery) {
+                        const alerts = pendingManagedAlerts.get(bean) || [];
+                        alerts.push({
+                            id: notification.id,
+                            revision: notification.delivery_revision,
+                            locale: config.locale,
+                            projectID: JSON.parse(notification.config).projectEncryption?.projectID || null,
+                            workContext,
+                        });
+                        pendingManagedAlerts.set(bean, alerts);
+                        continue;
+                    }
                     await Notification.send(
-                        JSON.parse(notification.config),
-                        msg,
+                        readNotificationConfig(notification),
+                        workContext ? monitorMessage(monitor, bean, config.locale, "", null, workContext) : msg,
                         monitor.toJSON(preloadData, false),
                         heartbeatJSON
                     );
@@ -1528,9 +1612,39 @@ class Monitor extends BeanModel {
     }
 
     /**
-     * Get list of notification providers for a given monitor
+     * Persist only sanitized managed notifications after the observation is committed.
      * @param {Monitor} monitor Monitor to get notification providers for
-     * @returns {Promise<LooseObject<any>[]>} List of notifications
+     * @param {object} bean Saved observation
+     * @returns {Promise<void>} Queued alerts
+     */
+    static async flushManagedNotifications(monitor, bean) {
+        const alerts = pendingManagedAlerts.get(bean) || [];
+        pendingManagedAlerts.delete(bean);
+        for (const alert of alerts) {
+            try {
+                let kind = bean.status === UP ? "up" : "down";
+                if (bean.status === MAINTENANCE) kind = "work";
+                await deliveryQueue.enqueue(
+                    monitor.user_id,
+                    alert.id,
+                    kind,
+                    monitorMessage(monitor, bean, alert.locale, await Settings.get("primaryBaseURL"), alert.projectID, alert.workContext),
+                    bean.status === MAINTENANCE
+                        ? `site-work:${monitor.id}:${workFromBeat(bean).runID}`
+                        : `heartbeat:${monitor.id}:${bean.time}:${bean.status}`,
+                    monitor.id,
+                    alert.revision
+                );
+            } catch {
+                log.error("notification", "notificationQueueUnavailable");
+            }
+        }
+    }
+
+    /**
+     * Get channels assigned to this check.
+     * @param {Monitor} monitor Owned check
+     * @returns {Promise<object[]>} Channel records
      */
     static async getNotificationList(monitor) {
         let notificationList = await R.getAll(
@@ -1548,28 +1662,56 @@ class Monitor extends BeanModel {
      * @param {number} daysRemaining Number of days remaining on certificate
      * @param {number} targetDays Number of days to alert after
      * @param {LooseObject<any>[]} notificationList List of notification providers
+     * @param {string} fingerprint Stable certificate identity, renewed certificates produce new events
      * @returns {Promise<void>}
      */
-    async sendCertNotificationByTargetDays(certCN, certType, daysRemaining, targetDays, notificationList) {
+    async sendCertNotificationByTargetDays(
+        certCN,
+        certType,
+        daysRemaining,
+        targetDays,
+        notificationList,
+        fingerprint = ""
+    ) {
         let row = await R.getRow(
             "SELECT * FROM notification_sent_history WHERE type = ? AND monitor_id = ? AND days <= ?",
             ["certificate", this.id, targetDays]
         );
-
-        // Sent already, no need to send again
-        if (row) {
-            log.debug("monitor", "Sent already, no need to send again");
-            return;
-        }
 
         let sent = false;
         log.debug("monitor", "Send certificate notification");
 
         for (let notification of notificationList) {
             try {
+                const config = readNotificationConfig(notification);
+                if (config.managedDelivery) {
+                    const host = serviceHost(this);
+                    const message =
+                        config.locale === "ru"
+                            ? `Срок сертификата: ${host}. Осталось дней: ${daysRemaining}.`
+                            : `Certificate expiry: ${host}. Days remaining: ${daysRemaining}.`;
+                    const identity = crypto
+                        .createHash("sha256")
+                        .update(fingerprint || `${certCN}:${certType}`)
+                        .digest("hex");
+                    await deliveryQueue.enqueue(
+                        this.user_id,
+                        notification.id,
+                        "certificate",
+                        message,
+                        `certificate:${this.id}:${targetDays}:${notification.delivery_revision}:${identity}`,
+                        this.id,
+                        notification.delivery_revision
+                    );
+                    continue;
+                }
+                // Legacy history does not verify or suppress a newly configured guided channel.
+                if (row) {
+                    continue;
+                }
                 log.debug("monitor", "Sending to " + notification.name);
                 await Notification.send(
-                    JSON.parse(notification.config),
+                    readNotificationConfig(notification),
                     `[${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`
                 );
                 sent = true;
@@ -1603,6 +1745,8 @@ class Monitor extends BeanModel {
      * @returns {Promise<boolean>} Is the monitor under maintenance
      */
     static async isUnderMaintenance(monitorID) {
+        const owned = await R.knex("monitor").where({ id: monitorID }).first();
+        if (owned && (await signalForMonitor(owned))?.state === "active") return true;
         const maintenanceIDList = await R.getCol(
             `
             SELECT maintenance_id FROM monitor_maintenance
@@ -1632,6 +1776,7 @@ class Monitor extends BeanModel {
      * @throws {Error} If validation fails
      */
     validate() {
+        this.max_response_time = responseTimeLimit(this.type, this.max_response_time);
         if (this.type === "sftp") {
             parseSshHostFingerprint(this.sshHostKeyFingerprint);
         }

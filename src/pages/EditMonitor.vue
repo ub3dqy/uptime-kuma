@@ -2,11 +2,22 @@
     <transition name="slide-fade" appear>
         <div>
             <h1 class="mb-3">{{ pageName }}</h1>
+            <MonitorPresets v-if="isAdd" @select="applyPreset" />
             <form @submit.prevent="submit">
                 <div class="shadow-box shadow-box-with-fixed-bottom-bar">
                     <div class="row">
                         <div class="col-md-6">
                             <h2 class="mb-2">{{ $t("General") }}</h2>
+
+                            <label v-if="['http', 'keyword', 'json-query'].includes(monitor.type)" class="ws-response-limit">
+                                {{ $t("stage2MaximumResponse") }}
+                                <input
+                                    v-model.number="monitor.max_response_time" class="form-control" type="number"
+                                    min="1" max="3600000" :placeholder="$t('stage2NoSpeedLimit')"
+                                    data-testid="response-time-limit"
+                                />
+                                <small class="form-text">{{ $t("stage2MaximumResponseHelp") }}</small>
+                            </label>
 
                             <i18n-t
                                 v-if="monitor.type === 'globalping'"
@@ -3281,6 +3292,7 @@
 </template>
 
 <script>
+import MonitorPresets from "../components/MonitorPresets.vue";
 import VueMultiselect from "vue-multiselect";
 import { useToast } from "../notifications";
 import ActionSelect from "../components/ActionSelect.vue";
@@ -3389,6 +3401,7 @@ const monitorDefaults = {
 
 export default {
     components: {
+        MonitorPresets,
         HiddenInput,
         ActionSelect,
         ProxyDialog,
@@ -3414,6 +3427,7 @@ export default {
             },
             domainExpiryUnsupportedReason: null,
             checkDomainDebounce: null,
+            domainCheckRequest: 0,
             acceptedStatusCodeOptions: [],
             acceptedWebsocketCodeOptions: [],
             dnsresolvetypeOptions: [],
@@ -3786,6 +3800,9 @@ message HealthCheckResponse {
         },
 
         "monitor.type"(newType, oldType) {
+            if (!["http", "keyword", "json-query"].includes(newType)) {
+                this.monitor.max_response_time = null;
+            }
             this.checkDomain();
 
             if (newType === "pm2") {
@@ -4038,7 +4055,19 @@ message HealthCheckResponse {
         this.globalpingdnsresolvetypeoptions = globalpingdnsresolvetypeoptions;
         this.kafkaSaslMechanismOptions = kafkaSaslMechanismOptions;
     },
+    beforeUnmount() {
+        clearTimeout(this.checkDomainDebounce);
+        this.domainCheckRequest++;
+    },
+
     methods: {
+        /**
+         * @param {object} preset Safe preset fields
+         * @returns {void} Keep name, credentials and target untouched
+         */
+        applyPreset(preset) {
+            Object.assign(this.monitor, preset);
+        },
         loadPM2ProcessList() {
             this.pm2ProcessLoading = true;
             this.pm2ProcessError = "";
@@ -4570,7 +4599,8 @@ message HealthCheckResponse {
         // Check Domain
         // Do nothing if not checked
         checkDomain() {
-            console.log("checkDomain called");
+            const request = ++this.domainCheckRequest;
+            const owner = this.$root.username;
             if (this.checkDomainDebounce != null) {
                 clearTimeout(this.checkDomainDebounce);
             }
@@ -4589,9 +4619,13 @@ message HealthCheckResponse {
                     grpcUrl,
                 };
 
-                this.$root.getSocket().emit("checkDomain", data, (res) => {
-                    console.log(data);
-                    if (!res.ok) {
+                this.$root.getSocket().timeout(10000).emit("checkDomain", data, (error, res) => {
+                    if (request !== this.domainCheckRequest || !this.$root.loggedIn || owner !== this.$root.username) {
+                        return;
+                    }
+                    if (error || !res) {
+                        this.domainExpiryUnsupportedReason = this.$t("workspaceDomainCheckUnavailable");
+                    } else if (!res.ok) {
                         this.domainExpiryUnsupportedReason = res.msgi18n ? this.$t(res.msg, res.meta) : res.msg;
                     } else {
                         this.domainExpiryUnsupportedReason = null;

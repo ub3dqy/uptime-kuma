@@ -41,7 +41,9 @@ export default {
             remember: localStorage.remember !== "0",
             allowLoginDialog: false, // Allowed to show login dialog, but "loggedIn" have to be true too. This exists because prevent the login dialog show 0.1s in first before the socket server auth-ed.
             loggedIn: false,
+            projectAccess: { actorID: null, projectOnly: false, installationAdmin: false },
             monitorList: {},
+            monitorListLoaded: false,
             monitorTypeList: {},
             maintenanceList: {},
             apiKeyList: {},
@@ -122,6 +124,19 @@ export default {
             socket.on("info", (info) => {
                 this.info = info;
             });
+            socket.on("projectAccess", (access) => {
+                if (this.projectAccess.actorID !== access.actorID || access.projectOnly) {
+                    this.clearOwnerData();
+                }
+                this.projectAccess = access;
+                if (
+                    access.projectOnly &&
+                    !this.$route.path.startsWith("/projects") &&
+                    !["/join-project", "/account"].includes(this.$route.path)
+                ) {
+                    this.$router.replace("/projects");
+                }
+            });
 
             socket.on("setup", (monitorID, data) => {
                 this.$router.push("/setup");
@@ -145,11 +160,18 @@ export default {
             });
 
             socket.on("monitorList", (data) => {
+                if (this.projectAccess.projectOnly) {
+                    return;
+                }
                 this.assignMonitorUrlParser(data);
                 this.monitorList = data;
+                this.monitorListLoaded = true;
             });
 
             socket.on("updateMonitorIntoList", (data) => {
+                if (this.projectAccess.projectOnly) {
+                    return;
+                }
                 this.assignMonitorUrlParser(data);
                 Object.entries(data).forEach(([monitorID, updatedMonitor]) => {
                     this.monitorList[monitorID] = updatedMonitor;
@@ -202,6 +224,9 @@ export default {
             });
 
             socket.on("heartbeat", (data) => {
+                if (this.projectAccess.projectOnly) {
+                    return;
+                }
                 if (!(data.monitorID in this.heartbeatList)) {
                     this.heartbeatList[data.monitorID] = [];
                 }
@@ -465,7 +490,8 @@ export default {
             this.socket.token = null;
             this.loggedIn = false;
             this.username = null;
-            this.clearData();
+            this.projectAccess = { actorID: null, projectOnly: false, installationAdmin: false };
+            this.clearOwnerData();
         },
 
         /**
@@ -666,6 +692,32 @@ export default {
         clearData() {
             console.log("reset heartbeat list");
             this.heartbeatList = {};
+        },
+        /** @returns {void} Remove previous human-owner data on logout or identity change */
+        clearOwnerData() {
+            this.clearData();
+            this.monitorListLoaded = false;
+            for (const field of [
+                "monitorList",
+                "maintenanceList",
+                "apiKeyList",
+                "avgPingList",
+                "uptimeList",
+                "tlsInfoList",
+                "domainInfoList",
+            ]) {
+                this[field] = {};
+            }
+            for (const field of [
+                "notificationList",
+                "dockerHostList",
+                "remoteBrowserList",
+                "statusPageList",
+                "proxyList",
+            ]) {
+                this[field] = [];
+            }
+            this.statusPageListLoaded = false;
         },
 
         /**

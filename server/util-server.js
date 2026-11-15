@@ -489,26 +489,24 @@ exports.checkCertificate = function (socket) {
 
 /**
  * Checks if the certificate is valid for the provided hostname.
- * Defaults to true if feature `X509Certificate` is not available, or input is not valid.
+ * Missing or malformed evidence never verifies a certificate identity.
  * @param {Buffer} certBuffer - The certificate buffer.
  * @param {string} hostname - The hostname to compare against.
  * @returns {boolean} True if the certificate is valid for the provided hostname, false otherwise.
  */
 exports.checkCertificateHostname = function (certBuffer, hostname) {
-    let X509Certificate;
+    if (!certBuffer || typeof hostname !== "string" || !hostname) {
+        return false;
+    }
     try {
-        X509Certificate = require("node:crypto").X509Certificate;
-    } catch (_) {
-        // X509Certificate is not available in this version of Node.js
-        return true;
+        const certObject = new (require("node:crypto").X509Certificate)(certBuffer);
+        const target = hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+        return require("node:net").isIP(target)
+            ? certObject.checkIP(target) !== undefined
+            : certObject.checkHost(target) !== undefined;
+    } catch {
+        return false;
     }
-
-    if (!X509Certificate || !certBuffer || !hostname) {
-        return true;
-    }
-
-    let certObject = new X509Certificate(certBuffer);
-    return certObject.checkHost(hostname) !== undefined;
 };
 
 /**
@@ -621,9 +619,9 @@ exports.doubleCheckPassword = async (socket, currentPassword) => {
         throw new Error("Wrong data type?");
     }
 
-    let user = await R.findOne("user", " id = ? AND active = 1 ", [socket.userID]);
+    let user = await require("./auth").findHumanByID(socket.userID);
 
-    if (!user || !passwordHash.verify(currentPassword, user.password)) {
+    if (!user || !passwordHash.verify(currentPassword, require("./auth").passwordFor(user))) {
         throw new Error("Incorrect current password");
     }
 
@@ -930,7 +928,8 @@ async function checkCertExpiryNotifications(monitor, tlsInfoObject) {
                     certInfo.certType,
                     certInfo.daysRemaining,
                     targetDays,
-                    notificationList
+                    notificationList,
+                    certInfo.fingerprint256 || certInfo.validTo
                 );
             }
             certInfo = certInfo.issuerCertificate;

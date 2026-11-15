@@ -1,0 +1,33 @@
+log_format uptime_kuma_pilot '$time_iso8601 $status $request_time $upstream_response_time $request_method';
+server {
+    listen 80;
+    listen [::]:80;
+    server_name kuma.example.com;
+    access_log /var/log/nginx/uptime-kuma-pilot.access.log uptime_kuma_pilot;
+    location ^~ /.well-known/acme-challenge/ { root /srv/uptime-kuma-pilot/acme; }
+    location / { return 301 https://kuma.example.com$request_uri; }
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name kuma.example.com;
+    access_log /var/log/nginx/uptime-kuma-pilot.access.log uptime_kuma_pilot;
+    ssl_certificate /etc/letsencrypt/live/kuma.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kuma.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=86400" always;
+    client_max_body_size 10m;
+    location / {
+        proxy_pass http://127.0.0.1:3041;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 90s;
+        proxy_send_timeout 90s;
+    }
+}

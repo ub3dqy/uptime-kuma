@@ -1,0 +1,12 @@
+[Unit]
+Description=Observe the Uptime Kuma pilot every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=5s
+RandomizedDelaySec=5s
+Persistent=true
+Unit=uptime-kuma-pilot-watch.service
+
+[Install]
+WantedBy=timers.target

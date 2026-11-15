@@ -1,40 +1,10 @@
 <template>
+    <Overview v-if="$route.name === 'DashboardHome'" />
     <transition ref="tableContainer" name="slide-fade" appear>
-        <div v-if="$route.name === 'DashboardHome'">
+        <div v-if="$route.name === 'Events'" class="workspace-events">
             <h1 class="mb-3">
-                {{ $t("Quick Stats") }}
+                {{ $t("workspaceEventHistory") }}
             </h1>
-
-            <div class="shadow-box big-padding text-center mb-3">
-                <div class="row">
-                    <div class="col">
-                        <h3>{{ $t("Up") }}</h3>
-                        <span class="num" :class="$root.stats.up === 0 && 'text-secondary'">
-                            {{ $root.stats.up }}
-                        </span>
-                    </div>
-                    <div class="col">
-                        <h3>{{ $t("Down") }}</h3>
-                        <span class="num" :class="$root.stats.down > 0 ? 'text-danger' : 'text-secondary'">
-                            {{ $root.stats.down }}
-                        </span>
-                    </div>
-                    <div class="col">
-                        <h3>{{ $t("Maintenance") }}</h3>
-                        <span class="num" :class="$root.stats.maintenance > 0 ? 'text-maintenance' : 'text-secondary'">
-                            {{ $root.stats.maintenance }}
-                        </span>
-                    </div>
-                    <div class="col">
-                        <h3>{{ $t("Unknown") }}</h3>
-                        <span class="num text-secondary">{{ $root.stats.unknown }}</span>
-                    </div>
-                    <div class="col">
-                        <h3>{{ $t("pauseDashboardHome") }}</h3>
-                        <span class="num text-secondary">{{ $root.stats.pause }}</span>
-                    </div>
-                </div>
-            </div>
 
             <div class="shadow-box table-shadow-box table-wrapper">
                 <div class="mb-3 text-end">
@@ -117,6 +87,7 @@ import Status from "../components/Status.vue";
 import Datetime from "../components/Datetime.vue";
 import Pagination from "v-pagination-3";
 import Confirm from "../components/Confirm.vue";
+import Overview from "./Overview.vue";
 
 export default {
     components: {
@@ -124,6 +95,7 @@ export default {
         Status,
         Pagination,
         Confirm,
+        Overview,
     },
     props: {
         calculatedHeight: {
@@ -166,6 +138,9 @@ export default {
     },
 
     mounted() {
+        if (this.$route.name !== "Events") {
+            return;
+        }
         this.getImportantHeartbeatListLength();
 
         this.$root.emitter.on("newImportantHeartbeat", this.onNewImportantHeartbeat);
@@ -268,10 +243,9 @@ export default {
         clearAllEventsDialog() {
             this.$refs.confirmClearEvents.show();
         },
-        clearAllEvents() {
+        async clearAllEvents() {
             this.clearingAllEvents = true;
             const monitorIDs = Object.keys(this.$root.monitorList);
-            let failed = 0;
             const total = monitorIDs.length;
 
             if (total === 0) {
@@ -280,13 +254,20 @@ export default {
                 return;
             }
 
-            monitorIDs.forEach((monitorID) => {
-                this.$root.getSocket().emit("clearEvents", monitorID, (res) => {
-                    if (!res || !res.ok) {
-                        failed++;
-                    }
-                });
-            });
+            const results = await Promise.all(
+                monitorIDs.map(
+                    (monitorID) =>
+                        new Promise((resolve) => {
+                            this.$root
+                                .getSocket()
+                                .timeout(15000)
+                                .emit("clearEvents", monitorID, (error, res) => {
+                                    resolve(!error && Boolean(res?.ok));
+                                });
+                        })
+                )
+            );
+            const failed = results.filter((success) => !success).length;
             this.clearingAllEvents = false;
             this.page = 1;
             this.getImportantHeartbeatListLength();
@@ -307,13 +288,6 @@ export default {
 
 <style lang="scss" scoped>
 @import "../assets/vars";
-
-.num {
-    font-size: 30px;
-    color: $primary;
-    font-weight: bold;
-    display: block;
-}
 
 .shadow-box {
     padding: 20px;

@@ -7,6 +7,10 @@ const { Notification } = require("../notification");
 const TranslatableError = require("../translatable-error");
 const dayjs = require("dayjs");
 const { Settings } = require("../settings");
+const { queue: deliveryQueue } = require("../notification-delivery");
+const { serviceHost } = require("../../src/overview-state.ts");
+const { createHash } = require("node:crypto");
+const { readNotificationConfig } = require("../notification-config");
 
 let cacheRdapDnsData = null;
 let nextChecking = 0;
@@ -153,9 +157,13 @@ async function sendDomainNotificationByTargetDays(domain, daysRemaining, targetD
 
     for (let notification of notificationList) {
         try {
+            const config = readNotificationConfig(notification);
+            if (config.managedDelivery === true) {
+                continue;
+            }
             log.debug("domain_expiry", `Sending to ${notification.name}`);
             await Notification.send(
-                JSON.parse(notification.config),
+                readNotificationConfig(notification),
                 `Domain name ${domain} will expire in ${daysRemaining} days`
             );
             sent = true;
@@ -304,9 +312,10 @@ class DomainExpiry extends BeanModel {
     /**
      * @param {string} domainName the domain name to send notifications for
      * @param {LooseObject<any>[]} notificationList notification List
+     * @param {object|null} monitor Owned check for the guided delivery workflow
      * @returns {Promise<void>}
      */
-    static async sendNotifications(domainName, notificationList) {
+    static async sendNotifications(domainName, notificationList, monitor = null) {
         const domain = await DomainExpiry.findByDomainNameOrCreate(domainName);
         if (!notificationList.length > 0) {
             // fail fast. If no notification is set, all the following checks can be skipped.
@@ -335,6 +344,34 @@ class DomainExpiry extends BeanModel {
         if (Array.isArray(notifyDays)) {
             // Asc sort to avoid sending multiple notifications if daysRemaining is below multiple targetDays
             notifyDays.sort((a, b) => a - b);
+            const guidedTarget = notifyDays.find((targetDays) => daysRemaining <= targetDays);
+            if (monitor && guidedTarget !== undefined) {
+                for (const notification of notificationList) {
+                    try {
+                        const config = readNotificationConfig(notification);
+                        if (config.managedDelivery !== true) {
+                            continue;
+                        }
+                        const host = serviceHost(monitor);
+                        const message =
+                            config.locale === "ru"
+                                ? `Срок домена: ${host}. Осталось дней: ${daysRemaining}.`
+                                : `Domain expiry: ${host}. Days remaining: ${daysRemaining}.`;
+                        const identity = createHash("sha256").update(`${domainName}:${domain.expiry}`).digest("hex");
+                        await deliveryQueue.enqueue(
+                            monitor.user_id,
+                            notification.id,
+                            "domain",
+                            message,
+                            `domain:${monitor.id}:${guidedTarget}:${notification.delivery_revision}:${identity}`,
+                            monitor.id,
+                            notification.delivery_revision
+                        );
+                    } catch {
+                        log.error("domain_expiry", "notificationQueueUnavailable");
+                    }
+                }
+            }
             for (const targetDays of notifyDays) {
                 if (daysRemaining > targetDays) {
                     log.debug(

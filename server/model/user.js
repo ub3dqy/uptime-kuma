@@ -13,6 +13,13 @@ class User extends BeanModel {
      * @returns {Promise<void>}
      */
     static async resetPassword(userID, newPassword) {
+        const user = await R.knex("user").where({ id: userID }).first();
+        if (user?.project_only && !user.service_account) {
+            await R.knex("project_identity")
+                .where({ user_id: userID })
+                .update({ password: await passwordHash.generate(newPassword) });
+            return;
+        }
         await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [
             await passwordHash.generate(newPassword),
             userID,
@@ -25,6 +32,12 @@ class User extends BeanModel {
      * @returns {Promise<void>}
      */
     async resetPassword(newPassword) {
+        if (this.project_only) {
+            const hash = await passwordHash.generate(newPassword);
+            await R.knex("project_identity").where({ user_id: this.id }).update({ password: hash });
+            require("../auth").rememberHumanPassword(this, hash);
+            return;
+        }
         const hashedPassword = await passwordHash.generate(newPassword);
 
         await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [hashedPassword, this.id]);
@@ -42,7 +55,7 @@ class User extends BeanModel {
         return jwt.sign(
             {
                 username: user.username,
-                h: shake256(user.password, SHAKE256_LENGTH),
+                h: shake256(require("../auth").passwordFor(user), SHAKE256_LENGTH),
             },
             jwtSecret
         );

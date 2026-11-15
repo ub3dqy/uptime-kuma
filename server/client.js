@@ -17,18 +17,41 @@ const Database = require("./database");
  */
 async function sendNotificationList(socket) {
     const timeLogger = new TimeLogger();
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
+    if (!userID) {
+        return [];
+    }
 
     let result = [];
-    let list = await R.find("notification", " user_id = ? ", [socket.userID]);
+    let list = await R.find("notification", " user_id = ? ", [userID]);
 
     for (let bean of list) {
         let notificationObject = bean.export();
         notificationObject.isDefault = notificationObject.isDefault === 1;
         notificationObject.active = notificationObject.active === 1;
+        let config = {};
+        try {
+            config = require("./notification-config").readNotificationConfig(notificationObject) || {};
+        } catch {
+            /* A broken old channel must not block login. */
+        }
+        if (config.managedDelivery === true) {
+            const { smtpPassword, telegramBotToken, ...visible } = config;
+            visible.hasSecret = Boolean(smtpPassword || telegramBotToken);
+            notificationObject.config = JSON.stringify(visible);
+        } else {
+            // Legacy provider editors remain owner-only and need their decoded
+            // settings. Guided mail/Telegram above never sends saved secrets.
+            notificationObject.config = JSON.stringify(config);
+        }
         result.push(notificationObject);
     }
 
-    io.to(socket.userID).emit("notificationList", result);
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return [];
+    }
+    io.to(userID).emit("notificationList", result);
 
     timeLogger.print("Send Notification List");
 
@@ -44,6 +67,8 @@ async function sendNotificationList(socket) {
  * @returns {Promise<void>}
  */
 async function sendHeartbeatList(socket, monitorID, toUser = false, overwrite = false) {
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
     let list = await R.getAll(
         `
         SELECT * FROM heartbeat
@@ -55,9 +80,12 @@ async function sendHeartbeatList(socket, monitorID, toUser = false, overwrite = 
     );
 
     let result = list.reverse();
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return;
+    }
 
     if (toUser) {
-        io.to(socket.userID).emit("heartbeatList", monitorID, result, overwrite);
+        io.to(userID).emit("heartbeatList", monitorID, result, overwrite);
     } else {
         socket.emit("heartbeatList", monitorID, result, overwrite);
     }
@@ -72,6 +100,8 @@ async function sendHeartbeatList(socket, monitorID, toUser = false, overwrite = 
  * @returns {Promise<void>}
  */
 async function sendImportantHeartbeatList(socket, monitorID, toUser = false, overwrite = false) {
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
     const timeLogger = new TimeLogger();
 
     let list = await R.find(
@@ -88,9 +118,12 @@ async function sendImportantHeartbeatList(socket, monitorID, toUser = false, ove
     timeLogger.print(`[Monitor: ${monitorID}] sendImportantHeartbeatList`);
 
     const result = list.map((bean) => bean.toJSON());
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return;
+    }
 
     if (toUser) {
-        io.to(socket.userID).emit("importantHeartbeatList", monitorID, result, overwrite);
+        io.to(userID).emit("importantHeartbeatList", monitorID, result, overwrite);
     } else {
         socket.emit("importantHeartbeatList", monitorID, result, overwrite);
     }
@@ -103,9 +136,14 @@ async function sendImportantHeartbeatList(socket, monitorID, toUser = false, ove
  */
 async function sendProxyList(socket) {
     const timeLogger = new TimeLogger();
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
 
-    const list = await R.find("proxy", " user_id = ? ", [socket.userID]);
-    io.to(socket.userID).emit(
+    const list = await R.find("proxy", " user_id = ? ", [userID]);
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return [];
+    }
+    io.to(userID).emit(
         "proxyList",
         list.map((bean) => bean.export())
     );
@@ -122,15 +160,20 @@ async function sendProxyList(socket) {
  */
 async function sendAPIKeyList(socket) {
     const timeLogger = new TimeLogger();
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
 
     let result = [];
-    const list = await R.find("api_key", "user_id=?", [socket.userID]);
+    const list = await R.find("api_key", "user_id=?", [userID]);
 
     for (let bean of list) {
         result.push(bean.toPublicJSON());
     }
 
-    io.to(socket.userID).emit("apiKeyList", result);
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return [];
+    }
+    io.to(userID).emit("apiKeyList", result);
     timeLogger.print("Sent API Key List");
 
     return list;
@@ -169,15 +212,20 @@ async function sendInfo(socket, hideVersion = false) {
  */
 async function sendDockerHostList(socket) {
     const timeLogger = new TimeLogger();
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
 
     let result = [];
-    let list = await R.find("docker_host", " user_id = ? ", [socket.userID]);
+    let list = await R.find("docker_host", " user_id = ? ", [userID]);
 
     for (let bean of list) {
         result.push(bean.toJSON());
     }
 
-    io.to(socket.userID).emit("dockerHostList", result);
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return [];
+    }
+    io.to(userID).emit("dockerHostList", result);
 
     timeLogger.print("Send Docker Host List");
 
@@ -191,15 +239,20 @@ async function sendDockerHostList(socket) {
  */
 async function sendRemoteBrowserList(socket) {
     const timeLogger = new TimeLogger();
+    const userID = socket.userID;
+    const generation = socket.projectGeneration;
 
     let result = [];
-    let list = await R.find("remote_browser", " user_id = ? ", [socket.userID]);
+    let list = await R.find("remote_browser", " user_id = ? ", [userID]);
 
     for (let bean of list) {
         result.push(bean.toJSON());
     }
 
-    io.to(socket.userID).emit("remoteBrowserList", result);
+    if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+        return [];
+    }
+    io.to(userID).emit("remoteBrowserList", result);
 
     timeLogger.print("Send Remote Browser List");
 

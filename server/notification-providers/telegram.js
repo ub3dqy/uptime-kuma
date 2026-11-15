@@ -100,10 +100,19 @@ class Telegram extends NotificationProvider {
             }
 
             let config = this.getAxiosConfigWithProxy();
+            if (notification.managedDelivery) {
+                Object.assign(config, { timeout: 15000, maxRedirects: 0, maxContentLength: 65536 });
+            }
 
-            await axios.post(`${url}/bot${notification.telegramBotToken}/sendMessage`, params, config);
+            const response = await axios.post(`${url}/bot${notification.telegramBotToken}/sendMessage`, params, config);
+            if (notification.managedDelivery && response.data?.ok !== true) {
+                throw new Error("Telegram submission was not confirmed");
+            }
             return okMsg;
         } catch (error) {
+            if (notification.managedDelivery) {
+                throw error;
+            }
             this.throwGeneralAxiosError(error);
         }
     }

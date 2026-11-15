@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh explicit deployment evidence
+
+[Timer]
+OnBootSec=5s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=uptime-kuma-site-state.service
+
+[Install]
+WantedBy=timers.target

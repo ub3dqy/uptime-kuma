@@ -21,7 +21,7 @@
                 />
             </div>
 
-            <router-link :to="monitorURL(monitor.id)" class="item" :class="{ disabled: !monitor.active }">
+            <router-link :to="monitorURL(monitor.id)" class="item" :class="{ 'is-paused': !monitor.active }">
                 <div class="row">
                     <div class="small-padding d-flex gap-2 align-items-center" :class="monitorStyle">
                         <div class="me-1">
@@ -36,7 +36,13 @@
                                 />
                             </span>
                             <div class="flex-fill text-truncate" style="min-width: 0">
-                                <div class="text-truncate">{{ monitor.name }}</div>
+                                <div class="monitor-list-title">
+                                    <span class="text-truncate">{{ monitor.name }}</span>
+                                    <span v-if="!monitor.active" class="monitor-paused-label">
+                                        <font-awesome-icon icon="pause" aria-hidden="true" />
+                                        {{ $t("workspaceStatePaused") }}
+                                    </span>
+                                </div>
                                 <div v-if="monitor.tags.length > 0" class="tags gap-1">
                                     <Tag
                                         v-for="tag in monitor.tags"
@@ -337,6 +343,26 @@ export default {
 .small-padding {
     padding-left: 5px !important;
     padding-right: 5px !important;
+}
+
+.monitor-list-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.monitor-paused-label {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 5px;
+    padding: 3px 7px;
+    border: 1px solid var(--ws-border, #dfe7ef);
+    border-radius: 6px;
+    color: var(--ws-muted, #5d6b81);
+    background: var(--ws-canvas, #f5f8fc);
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 .tags {

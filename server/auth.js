@@ -5,6 +5,36 @@ const { log } = require("../src/util");
 const { loginRateLimiter, apiRateLimiter } = require("./rate-limiter");
 const { Settings } = require("./settings");
 const dayjs = require("dayjs");
+const humanPasswords = new WeakMap();
+
+/**
+ * Resolve participants without enabling them in an older installation binary.
+ * @param {string} field Trusted identity column
+ * @param {number|string} value Identity
+ * @returns {Promise<object|null>} Active human
+ */
+async function findHuman(field, value) {
+    const user = await R.findOne("user", field === "id" ? "id = ?" : "TRIM(username) = ?", [value]);
+    if (!user || user.service_account) {
+        return null;
+    }
+    if (user.project_only) {
+        const identity = await R.knex("project_identity").where({ user_id: user.id, active: 1 }).first();
+        if (!identity) {
+            return null;
+        }
+        humanPasswords.set(user, identity.password);
+    } else if (!user.active) {
+        return null;
+    }
+    return user;
+}
+
+exports.findHumanByID = (value) => findHuman("id", value);
+exports.findHumanByUsername = (value) =>
+    typeof value === "string" ? findHuman("username", value.trim()) : Promise.resolve(null);
+exports.passwordFor = (user) => humanPasswords.get(user) || user.password;
+exports.rememberHumanPassword = (user, hash) => humanPasswords.set(user, hash);
 
 /**
  * Login to web app
@@ -17,11 +47,11 @@ exports.login = async function (username, password) {
         return null;
     }
 
-    let user = await R.findOne("user", "TRIM(username) = ? AND active = 1 ", [username.trim()]);
+    let user = await exports.findHumanByUsername(username);
 
-    if (user && passwordHash.verify(password, user.password)) {
+    if (user && passwordHash.verify(password, exports.passwordFor(user))) {
         // Upgrade the hash to bcrypt
-        if (passwordHash.needRehash(user.password)) {
+        if (!user.project_only && passwordHash.needRehash(user.password)) {
             await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [
                 await passwordHash.generate(password),
                 user.id,
@@ -114,7 +144,7 @@ function userAuthorizer(username, password, callback) {
                 exports
                     .login(username, password)
                     .then((user) => {
-                        callback(null, user != null);
+                        callback(null, user != null && !user.project_only);
 
                         if (user == null) {
                             log.warn("basic-auth", "Failed basic auth attempt: invalid username/password");

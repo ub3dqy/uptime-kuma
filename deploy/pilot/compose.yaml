@@ -1,0 +1,69 @@
+services:
+  kuma:
+    image: ${KUMA_IMAGE:?Set the verified pilot image}
+    pull_policy: never
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.75
+    mem_limit: 768m
+    pids_limit: 256
+    stop_grace_period: 60s
+    environment:
+      NODE_ENV: production
+      UPTIME_KUMA_HOST: 0.0.0.0
+      UPTIME_KUMA_PORT: "3001"
+      UPTIME_KUMA_DB_TYPE: sqlite
+      UPTIME_KUMA_ENABLE_EMBEDDED_MARIADB: "0"
+      NOTIFICATION_PROXY: ${KUMA_NOTIFICATION_PROXY:-}
+      UPTIME_KUMA_TELEGRAM_CONTROL_CONFIG: ${KUMA_TELEGRAM_CONTROL_CONFIG:-}
+    ports:
+      - "127.0.0.1:${KUMA_PORT:?Set the dedicated loopback port}:3001"
+    volumes:
+      - type: bind
+        source: ./data
+        target: /app/data
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:size=134217728,mode=1777
+    healthcheck:
+      test: [CMD, node, extra/pilot-healthcheck.cjs]
+      interval: 30s
+      timeout: 7s
+      start_period: 120s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+    labels:
+      com.ub3dqy.pilot: uptime-kuma
+  canary:
+    image: ${KUMA_IMAGE:?Set the verified pilot image}
+    pull_policy: never
+    command: [node, extra/pilot-canary.cjs]
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.10
+    mem_limit: 96m
+    pids_limit: 64
+    environment:
+      UPTIME_KUMA_PORT: "8080"
+      UPTIME_KUMA_HEALTH_PATH: /
+    tmpfs:
+      - /tmp:size=16777216,mode=1777
+    healthcheck:
+      test: [CMD, node, extra/pilot-healthcheck.cjs]
+      interval: 30s
+      timeout: 7s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 2m, max-file: "2"}
+    labels:
+      com.ub3dqy.pilot: uptime-kuma

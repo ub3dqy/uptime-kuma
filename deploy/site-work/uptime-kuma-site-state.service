@@ -1,0 +1,30 @@
+[Unit]
+Description=Read explicit site deployment markers for Uptime Kuma
+
+[Service]
+Type=oneshot
+User=root
+Group=kuma-site-peer
+ExecStart=/usr/bin/python3 -I /usr/local/lib/uptime-kuma-site-work/source.py --root /opt/example-service --output /var/lib/uptime-kuma-site-state/state.json --read-group kuma-site-peer --deadline-minutes 30
+StateDirectory=uptime-kuma-site-state
+StateDirectoryMode=0750
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+ReadOnlyPaths=/opt/example-service
+ReadWritePaths=/var/lib/uptime-kuma-site-state
+MemoryMax=48M
+MemorySwapMax=0
+LimitCORE=0
+TasksMax=16
+TimeoutStartSec=10

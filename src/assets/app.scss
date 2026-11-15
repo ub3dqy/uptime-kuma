@@ -502,10 +502,6 @@ optgroup {
         border-radius: 10px;
         transition: all ease-in-out 0.15s;
 
-        &.disabled {
-            opacity: 0.3;
-        }
-
         .info {
             white-space: nowrap;
             overflow: hidden;

@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "targets": [
+        {
+            "id": "my-app",
+            "projectID": 2,
+            "monitorID": 12,
+            "title": "Моё приложение",
+            "root": "/srv/managed-app",
+            "file": "/srv/managed-app/config.json",
+            "baseline": "/srv/managed-app/approved/config.json",
+            "baselineSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "checkURL": "https://application.example/health",
+            "reload": {
+                "kind": "live"
+            },
+            "verifySeconds": 120
+        }
+    ]
+}

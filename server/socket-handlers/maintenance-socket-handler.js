@@ -7,6 +7,22 @@ const Maintenance = require("../model/maintenance");
 const server = UptimeKumaServer.getInstance();
 
 /**
+ * @param {object} db Current database connection or transaction
+ * @param {number} maintenanceID Requested window
+ * @param {number} userID Logged-in owner
+ * @returns {Promise<void>} Require ownership before reading or changing associations
+ */
+async function requireOwner(db, maintenanceID, userID) {
+    const query = db("maintenance").where({ id: maintenanceID, user_id: userID }).first("id");
+    if (db.isTransaction) {
+        query.forUpdate();
+    }
+    if (!(await query)) {
+        throw new Error("Maintenance not found");
+    }
+}
+
+/**
  * Handlers for Maintenance
  * @param {Socket} socket Socket.io instance
  * @returns {void}
@@ -49,7 +65,7 @@ module.exports.maintenanceSocketHandler = (socket) => {
 
             let bean = server.getMaintenance(maintenance.id);
 
-            if (bean.user_id !== socket.userID) {
+            if (!bean || bean.user_id !== socket.userID) {
                 throw new Error("Permission denied.");
             }
 
@@ -78,17 +94,22 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            await R.exec("DELETE FROM monitor_maintenance WHERE maintenance_id = ?", [maintenanceID]);
-
-            for await (const monitor of monitors) {
-                let bean = R.dispense("monitor_maintenance");
-
-                bean.import({
-                    monitor_id: monitor.id,
-                    maintenance_id: maintenanceID,
-                });
-                await R.store(bean);
-            }
+            const userID = socket.userID;
+            await R.knex.transaction(async (tx) => {
+                await requireOwner(tx, maintenanceID, userID);
+                const ids = [...new Set(monitors.map((monitor) => monitor.id))];
+                const owned = await tx("monitor").where("user_id", userID).whereIn("id", ids).select("id");
+                if (owned.length !== ids.length) {
+                    throw new Error("Monitor not found");
+                }
+                await tx("monitor_maintenance").where({ maintenance_id: maintenanceID }).delete();
+                if (owned.length) {
+                    await tx("monitor_maintenance").insert(owned.map(({ id }) => ({
+                        monitor_id: id,
+                        maintenance_id: maintenanceID,
+                    })));
+                }
+            });
 
             apicache.clear();
 
@@ -110,17 +131,17 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            await R.exec("DELETE FROM maintenance_status_page WHERE maintenance_id = ?", [maintenanceID]);
-
-            for await (const statusPage of statusPages) {
-                let bean = R.dispense("maintenance_status_page");
-
-                bean.import({
-                    status_page_id: statusPage.id,
-                    maintenance_id: maintenanceID,
-                });
-                await R.store(bean);
-            }
+            const userID = socket.userID;
+            await R.knex.transaction(async (tx) => {
+                await requireOwner(tx, maintenanceID, userID);
+                await tx("maintenance_status_page").where({ maintenance_id: maintenanceID }).delete();
+                if (statusPages.length) {
+                    await tx("maintenance_status_page").insert(statusPages.map(({ id }) => ({
+                        status_page_id: id,
+                        maintenance_id: maintenanceID,
+                    })));
+                }
+            });
 
             apicache.clear();
 
@@ -176,20 +197,20 @@ module.exports.maintenanceSocketHandler = (socket) => {
     socket.on("getMonitorMaintenance", async (maintenanceID, callback) => {
         try {
             checkLogin(socket);
+            await requireOwner(R.knex, maintenanceID, socket.userID);
 
             log.debug("maintenance", `Get Monitors for Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
-            let monitors = await R.getAll(
-                "SELECT monitor.id FROM monitor_maintenance mm JOIN monitor ON mm.monitor_id = monitor.id WHERE mm.maintenance_id = ? ",
-                [maintenanceID]
-            );
+            let monitors = await R.knex("monitor_maintenance as mm")
+                .join("monitor", "mm.monitor_id", "monitor.id")
+                .where({ "mm.maintenance_id": maintenanceID, "monitor.user_id": socket.userID })
+                .select("monitor.id");
 
             callback({
                 ok: true,
                 monitors,
             });
         } catch (e) {
-            log.error("maintenance", e);
             callback({
                 ok: false,
                 msg: e.message,
@@ -200,6 +221,7 @@ module.exports.maintenanceSocketHandler = (socket) => {
     socket.on("getMaintenanceStatusPage", async (maintenanceID, callback) => {
         try {
             checkLogin(socket);
+            await requireOwner(R.knex, maintenanceID, socket.userID);
 
             log.debug("maintenance", `Get Status Pages for Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
@@ -227,12 +249,12 @@ module.exports.maintenanceSocketHandler = (socket) => {
 
             log.debug("maintenance", `Delete Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
-            if (maintenanceID in server.maintenanceList) {
-                server.maintenanceList[maintenanceID].stop();
-                delete server.maintenanceList[maintenanceID];
+            const removed = await R.knex("maintenance").where({ id: maintenanceID, user_id: socket.userID }).delete();
+            if (!removed) {
+                throw new Error("Maintenance not found");
             }
-
-            await R.exec("DELETE FROM maintenance WHERE id = ? AND user_id = ? ", [maintenanceID, socket.userID]);
+            server.maintenanceList[maintenanceID]?.stop();
+            delete server.maintenanceList[maintenanceID];
 
             apicache.clear();
 
@@ -259,7 +281,7 @@ module.exports.maintenanceSocketHandler = (socket) => {
 
             let maintenance = server.getMaintenance(maintenanceID);
 
-            if (!maintenance) {
+            if (!maintenance || maintenance.user_id !== socket.userID) {
                 throw new Error("Maintenance not found");
             }
 
@@ -292,7 +314,7 @@ module.exports.maintenanceSocketHandler = (socket) => {
 
             let maintenance = server.getMaintenance(maintenanceID);
 
-            if (!maintenance) {
+            if (!maintenance || maintenance.user_id !== socket.userID) {
                 throw new Error("Maintenance not found");
             }
 

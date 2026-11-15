@@ -12,6 +12,10 @@ dist-ssr
 
 /private
 /outputs
+/deploy/pilot/__pycache__/
+/test/pilot/__pycache__/
+/deploy/witness/__pycache__/
+/test/witness/__pycache__/
 /out
 /tmp
 .env

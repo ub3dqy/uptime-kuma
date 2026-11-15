@@ -5,7 +5,7 @@ is still required before production use.
 
 This independently maintained fork starts from upstream **2.5.8**. Uptime Kuma
 was created by Louis Lam and its contributors. The original MIT license and
-attribution are retained. This edition is maintained by Dima Mak / ub3dqy.
+attribution are retained. This edition is maintained by ub3dqy.
 
 ## First addition: retained check history as CSV
 
@@ -36,7 +36,7 @@ first addition is a raw history export, not an SLA or incident-duration report.
 Install **Node.js 24.22.2 LTS (24.x)** and Git, then run:
 
 ```sh
-git clone --branch main https://github.com/ub3dqy/uptime-kuma.git
+git clone --branch codex/telegram-control https://github.com/ub3dqy/uptime-kuma.git
 cd uptime-kuma
 npm run setup
 node server/server.js --host=127.0.0.1 --port=3001
@@ -86,12 +86,81 @@ Backend, browser, database and TLS results and platform limits are recorded in
 the Linux/amd64 Docker release have passed local acceptance. A live server
 installation has not been qualified.
 
+## Period summaries
+
+Use **Calculate summary** beside the CSV button. The UTC range is half-open,
+limited to 31 days and 50,000 saved checks, and cannot end in the future.
+Access is authenticated and owner-scoped, with one summary per account at a time.
+Messages, stored response bodies and monitor configuration are never included.
+
+The summary shows UP, DOWN, PENDING and MAINTENANCE counts and estimated time,
+unknown time, observation coverage and successful-response mean, minimum,
+maximum and nearest-rank p95. Zero-millisecond responses are valid samples.
+
+Time is estimated between adjacent saved checks in the same uninterrupted run.
+The earlier state is carried forward for at most its recorded check interval;
+the remaining gap is unknown. Pauses, restarts and configuration edits break a
+run. There is no extrapolation after the final saved check. One neighboring row
+on either side clips the selected period without entering its counts or latency
+statistics. Unknown states provide no time coverage.
+
+Availability is UP time divided by UP + DOWN time. PENDING, MAINTENANCE and
+unknown time are excluded. Always read this with observation coverage, which
+includes all four recognized states over the full period. A 100% result with low
+coverage does not establish 100% availability for the full period. No accounted
+UP or DOWN time yields no availability percentage.
+
+New heartbeats save the effective interval and a private run identifier. Old
+rows intentionally remain without those fields: their counts and response
+samples are usable, but their time remains unknown. Today's settings cannot
+reconstruct historical schedules, deleted history, missed-run counts or the
+cause of a gap. These sampled estimates do not establish contractual SLA.
+
+The existing daily cleanup removes non-important rows older than 24 hours,
+retaining the most recent 100 rows per monitor. Older ranges can therefore have
+low coverage even after this update. This feature leaves retention unchanged and
+does not reconstruct missing observations from old aggregate statistics, which
+do not preserve trustworthy gap boundaries. Incomplete percentages near 100%
+are displayed as less than 100%, so rounding cannot conceal a small gap.
+
+## Client groups and printable reports
+
+Open **Clients** in the desktop header or the mobile settings menu. Create a
+named group and select individual owned checks. One check may belong to several
+clients. Upstream monitor groups remain unchanged; their descendants are not
+expanded automatically. These groups organize this account's checks and do not
+create client accounts or grant access.
+
+For a saved group, select a UTC period and **Open period report**. The aggregate
+adds monitor-time: three checks over one day have a three-day denominator.
+Availability uses summed UP / (UP + DOWN) time, rather than an average of
+per-monitor percentages. Coverage and unknown time remain explicit. Response
+statistics, including p95, are shown separately for each check.
+
+**Print / save PDF** opens the browser print dialog. The standalone report prints
+the client name, UTC period, preparation time, membership revision, totals and
+per-check results without application navigation or controls. Check names are
+included; inspect the document before sharing. The report URL requires login
+and is not a public sharing link. The printed snapshot stays unchanged after
+later membership edits.
+
+Reports use current saved membership, not historical client assignments. A
+membership revision prevents stale editors from silently overwriting changes;
+stale report URLs require refreshing the client list. If saving loses its
+acknowledgement, refresh before retrying. Deleting a group preserves its checks
+and history. Deleting a monitor removes its memberships through foreign keys.
+
+Limits are 100 clients per account, 100 checks per client, 31 days and a single
+50,000-row in-period history budget for the entire report. Exceeding a limit
+fails the whole report, with no partial result. Empty clients have no availability
+percentage. Messages, settings, credentials and saved response bodies are not
+included. The existing history retention and missing-data limitations still apply.
+
 ## Development and scope
 
 Run the relevant backend and browser tests and build the frontend before
 publishing changes. This fork receives its own changes; submitting work to the
 upstream repository requires a separate decision and its contribution rules.
 
-Next planned milestones are period summaries with explicit missing-data
-handling, client groups, and printable reports. They are not included in the
-first CSV export.
+Client groups and printable reports are implemented. A sustained trial on the
+chosen permanent server remains separate deployment qualification.

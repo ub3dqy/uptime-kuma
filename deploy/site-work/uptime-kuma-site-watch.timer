@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh planned site work in Uptime Kuma
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=uptime-kuma-site-watch.service
+
+[Install]
+WantedBy=timers.target

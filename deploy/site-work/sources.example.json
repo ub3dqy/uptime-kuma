@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "announcements": "/var/lib/uptime-kuma-site-announcements",
+    "profiles": [
+        { "id": "shop", "adapter": "manual", "minutes": 30 },
+        { "id": "company", "adapter": "directory", "path": "/var/lib/company-deploy/pending", "minutes": 30 },
+        { "id": "personal", "adapter": "lock", "path": "/opt/personal/.maintenance.lock", "minutes": 30 }
+    ]
+}

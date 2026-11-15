@@ -256,6 +256,9 @@ class Notification {
      * @throws Error with fail msg
      */
     static async send(notification, msg, monitorJSON = null, heartbeatJSON = null) {
+        if (notification.managedDelivery === true) {
+            notification = require("./managed-alert-config").managedAlertConfig(notification);
+        }
         if (this.providerList[notification.type]) {
             return this.providerList[notification.type].send(notification, msg, monitorJSON, heartbeatJSON);
         } else {
@@ -271,6 +274,9 @@ class Notification {
      * @returns {Promise<Bean>} Notification that was saved
      */
     static async save(notification, notificationID, userID) {
+        if (notification.managedDelivery !== undefined && typeof notification.managedDelivery !== "boolean") {
+            throw new Error("stage2ChannelInvalid");
+        }
         let bean;
 
         if (notificationID) {
@@ -284,13 +290,22 @@ class Notification {
         }
 
         // applyExisting is one time only, don't save it to database.
+        if (notification.managedDelivery === true) {
+            notification = require("./managed-alert-config").managedAlertConfig(
+                notification,
+                bean.config ? require("./notification-config").readNotificationConfig(bean) : null
+            );
+        }
         const applyExisting = notification.applyExisting || false;
         notification.applyExisting = false;
 
         bean.name = notification.name;
         bean.user_id = userID;
-        bean.config = JSON.stringify(notification);
+        bean.config = JSON.stringify(
+            await require("./notification-config").protectNotificationConfig(notification, userID, bean.config)
+        );
         bean.is_default = notification.isDefault || false;
+        bean.delivery_revision = bean.id ? (bean.delivery_revision || 1) + 1 : 1;
         await R.store(bean);
 
         if (applyExisting) {

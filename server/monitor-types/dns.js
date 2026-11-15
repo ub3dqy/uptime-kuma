@@ -23,8 +23,20 @@ class DnsMonitorType extends MonitorType {
         let startTime = dayjs().valueOf();
         let dnsMessage = "";
 
-        const resolverServers = await this.resolveDnsResolverServers(monitor.dns_resolve_server);
-        let dnsRes = await this.dnsResolve(monitor.hostname, resolverServers, monitor.port, monitor.dns_resolve_type);
+        const policy = await require("../projects/network-policy").policyForOwner(monitor.user_id);
+        const resolverServers = policy
+            ? [monitor.dns_resolve_server]
+            : await this.resolveDnsResolverServers(monitor.dns_resolve_server);
+        if (policy && resolverServers.some((address) => !policy.permits(address))) {
+            throw new Error("PROJECT_TARGET_BLOCKED");
+        }
+        let dnsRes = await this.dnsResolve(
+            monitor.hostname,
+            resolverServers,
+            monitor.port,
+            monitor.dns_resolve_type,
+            Boolean(policy)
+        );
         heartbeat.ping = dayjs().valueOf() - startTime;
 
         const conditions = ConditionExpressionGroup.fromMonitor(monitor);
@@ -169,10 +181,11 @@ class DnsMonitorType extends MonitorType {
      * @param {string[]} resolverServer Array of DNS server IP addresses to use
      * @param {string} resolverPort Port the DNS server is listening on
      * @param {string} rrtype The type of record to request
+     * @param {boolean} bounded Whether this is a restricted project query
      * @returns {Promise<(string[] | object[] | object)>} DNS response
      */
-    async dnsResolve(hostname, resolverServer, resolverPort, rrtype) {
-        const resolver = new Resolver();
+    async dnsResolve(hostname, resolverServer, resolverPort, rrtype, bounded = false) {
+        const resolver = bounded ? new Resolver({ timeout: 5000, tries: 2 }) : new Resolver();
         resolver.setServers(resolverServer.map((server) => `[${server}]:${resolverPort}`));
         if (rrtype === "PTR") {
             return await resolver.reverse(hostname);

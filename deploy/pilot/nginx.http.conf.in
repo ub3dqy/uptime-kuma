@@ -1,0 +1,14 @@
+log_format uptime_kuma_pilot '$time_iso8601 $status $request_time $upstream_response_time $request_method';
+server {
+    listen 80;
+    listen [::]:80;
+    server_name kuma.example.com;
+    access_log /var/log/nginx/uptime-kuma-pilot.access.log uptime_kuma_pilot;
+    location ^~ /.well-known/acme-challenge/ {
+        root /srv/uptime-kuma-pilot/acme;
+        default_type text/plain;
+    }
+    location / {
+        return 503;
+    }
+}

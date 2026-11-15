@@ -1,0 +1,13 @@
+[Unit]
+Description=Uptime Kuma continuous observation and verified daily backup
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/uptime-kuma-pilot
+ExecStart=/usr/bin/python3 /srv/uptime-kuma-pilot/pilot.py tick
+User=root
+UMask=0077
+TimeoutStartSec=600
+Nice=10

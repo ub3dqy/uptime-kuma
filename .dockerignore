@@ -8,6 +8,7 @@
 **/.dockerignore
 /private
 /outputs
+/deploy
 **/.git
 **/.gitignore
 **/docker-compose*

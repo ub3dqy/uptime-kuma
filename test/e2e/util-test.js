@@ -1,8 +1,10 @@
 const fs = require("fs");
 const path = require("path");
-const serverUrl = require("../../config/playwright.config.js").url;
+const serverUrl = process.env.KUMA_E2E_SERVER_URL || require("../../config/playwright.config.js").url;
 
-const dbPath = "./../../data/playwright-test/kuma.db";
+const dbPath = process.env.KUMA_E2E_DB_PATH
+    ? path.resolve(process.env.KUMA_E2E_DB_PATH)
+    : "./../../data/playwright-test/kuma.db";
 
 /**
  * @param {TestInfo} testInfo Test info
