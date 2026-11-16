@@ -1,3 +1,11 @@
+# Contributing to the ub3dqy edition
+
+[Report a bug](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Suggest an improvement](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml) · [Private security reports](SECURITY.md)
+
+[Сообщить об ошибке](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Предложить улучшение](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml) · [Сообщить об уязвимости](SECURITY.md)
+
+The contribution guide below is from the original Uptime Kuma project.
+
 # Project Info
 
 First of all, I want to thank everyone who has submitted issues or shared pull
