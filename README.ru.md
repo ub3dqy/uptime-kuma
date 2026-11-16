@@ -14,6 +14,8 @@
 [![Сообщить об ошибке](docs/media/pilot-bug-ru.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml)
 [![Предложить идею](docs/media/pilot-idea-ru.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
+[Записаться на недельную пробу](https://github.com/ub3dqy/uptime-kuma/issues/1)
+
 ## Что умеет Kuma
 
 | Задача | Что есть в программе |

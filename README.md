@@ -14,6 +14,8 @@ A shop's front page can look fine while the checkout link leads to an error. Kum
 [![Report a bug](docs/media/pilot-bug-en.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml)
 [![Suggest an idea](docs/media/pilot-idea-en.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
+[Join the seven-day trial](https://github.com/ub3dqy/uptime-kuma/issues/1)
+
 ## What you can do
 
 | Task | What Kuma offers |
