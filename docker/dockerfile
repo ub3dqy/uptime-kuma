@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
 ############################################
 # Build in Node.js
 ############################################
-FROM node:24.22.2-bookworm-slim AS build
+FROM node:24.22.3-bookworm-slim AS build
 RUN apt-get update && apt-get install --yes --no-install-recommends python3 make g++ && \
     rm -rf /var/lib/apt/lists/* && mkdir /app && chown node:node /app
 USER node
@@ -53,6 +53,12 @@ CMD ["node", "server/server.js"]
 ############################################
 FROM release AS rootless
 USER node
+
+############################################
+# Public preview
+############################################
+FROM rootless AS preview
+ENV UPTIME_KUMA_DISABLE_JSONATA=1
 
 ############################################
 # Mark as Nightly

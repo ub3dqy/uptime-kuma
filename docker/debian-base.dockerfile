@@ -1,5 +1,5 @@
 # Download Apprise deb package
-FROM node:24.22.2-bookworm-slim AS download-apprise
+FROM node:24.22.3-bookworm-slim AS download-apprise
 WORKDIR /app
 ARG APPRISE_VERSION=2.1.0-1
 # APT verifies the signed Debian index and the package hash before the file is copied.
@@ -13,7 +13,7 @@ RUN apt-get update && \
 
 # Base Image (Slim)
 # If the image changed, the second stage image should be changed too
-FROM node:24.22.2-bookworm-slim AS base2-slim
+FROM node:24.22.3-bookworm-slim AS base2-slim
 ARG TARGETPLATFORM
 
 # Specify --no-install-recommends to skip unused dependencies, make the base much smaller!

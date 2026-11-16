@@ -1,11 +1,35 @@
-# Uptime Kuma — ub3dqy edition
+# Uptime Kuma · ub3dqy edition
 
-**Development edition:** [deployment and dependency review](SECURITY-BASELINE.md)
-is still required before production use.
+Monitor client websites on your own server, see when they were down, and share a printable report for each client.
 
-This independently maintained fork starts from upstream **2.5.8**. Uptime Kuma
-was created by Louis Lam and its contributors. The original MIT license and
-attribution are retained. This edition is maintained by Dima Mak / ub3dqy.
+[Try the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.1) · [Watch the report demo](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.1/demo-report.mp4) · [Русская версия](FORK.ru.md)
+
+This independent preview is based on Uptime Kuma 2.5.8, originally created by Louis Lam and contributors. It is maintained by Dima Mak / ub3dqy and uses the MIT license.
+
+## Installation
+
+Use this preview for an independent trial with a fresh data volume. The ready-to-run archive requires Docker with Linux x86-64 containers. Docker Desktop users can run it with the Linux engine. The setup below uses SQLite.
+
+1. Download `kuma-preview-linux-amd64.tar.gz` and `SHA256SUMS.txt` from the [preview release](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.1). Compare the archive’s SHA-256 with the published value. Run `sha256sum kuma-preview-linux-amd64.tar.gz` on Linux or `Get-FileHash .\kuma-preview-linux-amd64.tar.gz` in PowerShell.
+2. In the download directory, run:
+
+   ```sh
+   docker load -i kuma-preview-linux-amd64.tar.gz
+   docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.1
+   ```
+
+3. Open <http://127.0.0.1:3001>, select **SQLite**, and create an administrator account. For a remote host, forward the port with `ssh -N -L 3001:127.0.0.1:3001 user@server`. If 3001 is taken on the Docker host, change the first 3001 in the run command and use the chosen port in the browser.
+4. Add two HTTP(S) monitors. Open **Clients**, name your group, choose both monitors, and save it. With some checks recorded, choose a period and click **Open period report**. Choose **Print / save PDF** to save a copy in your browser.
+
+The report is based on retained observations. Pick a recent period for the first run. The report shows how much of the period was observed, and labels any time without data.
+
+Use `docker stop uptime-kuma-preview` to stop and `docker start uptime-kuma-preview` to resume. The named volume preserves the data between starts. Keep a separate copy of the volume before trying an update. New preview builds are listed under [Releases](https://github.com/ub3dqy/uptime-kuma/releases).
+
+JSONata expression checks are disabled in the ready-to-run preview, including checks that use saved expressions. Use plain HTTP(S) checks for the trial.
+
+**Build from source.** Use Node.js 24.22.3 LTS or later in the 24.x series. Clone `v2.5.8-ub3dqy.preview.1`, then run `npm run setup` from the checkout. Start with `UPTIME_KUMA_DISABLE_JSONATA=1 node server/server.js --host=127.0.0.1 --port=3001` in a POSIX shell. In PowerShell set `$env:UPTIME_KUMA_DISABLE_JSONATA = '1'` before the same `node` command.
+
+[Report a bug](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Suggest an improvement](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
 ## First addition: retained check history as CSV
 
@@ -30,38 +54,6 @@ Only rows still retained in the heartbeat table are exported. An empty export
 does not prove that a site was up or down. Missing observations, pauses,
 retention cleanup and server outages are not converted into uptime. This
 first addition is a raw history export, not an SLA or incident-duration report.
-
-## Install this edition
-
-Install **Node.js 24.22.2 LTS (24.x)** and Git, then run:
-
-```sh
-git clone --branch main https://github.com/ub3dqy/uptime-kuma.git
-cd uptime-kuma
-npm run setup
-node server/server.js --host=127.0.0.1 --port=3001
-```
-
-Open `http://127.0.0.1:3001` and complete the database and administrator setup.
-The example listens on the local machine. For a shared installation, configure
-TLS, access controls and a service manager for your environment. Keep the data
-directory outside the checkout when replacing application files, and back it
-up before upgrades. Restore upgrades on a copy before changing live data.
-
-The fork's `setup` builds its frontend from source. Upstream prebuilt frontend
-archives do not contain this edition's additions.
-
-To use Docker, build this edition's base and release image from the same checkout
-after `setup`:
-
-```sh
-npm run build-docker-base
-docker build -f docker/dockerfile --target release -t ub3dqy/uptime-kuma:local .
-docker run -d --name uptime-kuma -p 127.0.0.1:3001:3001 -v uptime-kuma-data:/app/data ub3dqy/uptime-kuma:local
-```
-
-This builds locally. Application data is kept in the separate `uptime-kuma-data`
-volume; back it up before upgrading.
 
 ## Validation of the first addition
 

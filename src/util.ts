@@ -657,6 +657,26 @@ export function intHash(str: string, length = 10): number {
 }
 
 /**
+ * Reject JSONata evaluation when the installation disables expression checks.
+ */
+export function assertJsonataEnabled(): void {
+    if (process.env.UPTIME_KUMA_DISABLE_JSONATA === "1") {
+        throw new Error("JSONata expression checks are disabled in this build.");
+    }
+}
+
+/**
+ * Evaluate a JSONata expression on a monitor's response.
+ * @param expression The configured expression.
+ * @param data The monitor response.
+ * @returns The evaluated value.
+ */
+export async function evaluateJsonata(expression: string, data: any): Promise<any> {
+    assertJsonataEnabled();
+    return jsonata(expression).evaluate(data);
+}
+
+/**
  * Evaluate a JSON query expression against the provided data.
  * @param data The data to evaluate the JSON query against.
  * @param jsonPath The JSON path or custom JSON query expression.
@@ -671,6 +691,7 @@ export async function evaluateJsonQuery(
     jsonPathOperator: string,
     expectedValue: any
 ): Promise<{ status: boolean; response: any }> {
+    assertJsonataEnabled();
     // Attempt to parse data as JSON; if unsuccessful, handle based on data type.
     let response: any;
     try {
@@ -682,7 +703,7 @@ export async function evaluateJsonQuery(
 
     try {
         // If a JSON path is provided, pre-evaluate the data using it.
-        response = jsonPath ? await jsonata(jsonPath).evaluate(response) : response;
+        response = jsonPath ? await evaluateJsonata(jsonPath, response) : response;
 
         if (response === null || response === undefined) {
             throw new Error("Empty or undefined response. Check query syntax and response structure");
@@ -729,8 +750,7 @@ export async function evaluateJsonQuery(
         }
 
         // Evaluate the JSON Query Expression
-        const expression = jsonata(jsonQueryExpression);
-        const status = await expression.evaluate({
+        const status = await evaluateJsonata(jsonQueryExpression, {
             value: response.toString(),
             expected: expectedValue.toString(),
         });

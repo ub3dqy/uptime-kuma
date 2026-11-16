@@ -98,6 +98,8 @@ exports.utcToISODateTime = utcToISODateTime;
 exports.utcToLocal = utcToLocal;
 exports.localToUTC = localToUTC;
 exports.intHash = intHash;
+exports.assertJsonataEnabled = assertJsonataEnabled;
+exports.evaluateJsonata = evaluateJsonata;
 exports.evaluateJsonQuery = evaluateJsonQuery;
 const dayjs_1 = __importDefault(require("dayjs"));
 const jsonata_1 = __importDefault(require("jsonata"));
@@ -468,7 +470,17 @@ function intHash(str, length = 10) {
     }
     return ((hash % length) + length) % length;
 }
+function assertJsonataEnabled() {
+    if (process.env.UPTIME_KUMA_DISABLE_JSONATA === "1") {
+        throw new Error("JSONata expression checks are disabled in this build.");
+    }
+}
+async function evaluateJsonata(expression, data) {
+    assertJsonataEnabled();
+    return (0, jsonata_1.default)(expression).evaluate(data);
+}
 async function evaluateJsonQuery(data, jsonPath, jsonPathOperator, expectedValue) {
+    assertJsonataEnabled();
     let response;
     try {
         response = JSON.parse(data);
@@ -477,7 +489,7 @@ async function evaluateJsonQuery(data, jsonPath, jsonPathOperator, expectedValue
             (typeof data === "object" || typeof data === "number") && !Buffer.isBuffer(data) ? data : data.toString();
     }
     try {
-        response = jsonPath ? await (0, jsonata_1.default)(jsonPath).evaluate(response) : response;
+        response = jsonPath ? await evaluateJsonata(jsonPath, response) : response;
         if (response === null || response === undefined) {
             throw new Error("Empty or undefined response. Check query syntax and response structure");
         }
@@ -516,8 +528,7 @@ async function evaluateJsonQuery(data, jsonPath, jsonPathOperator, expectedValue
             default:
                 throw new Error(`Invalid condition ${jsonPathOperator}`);
         }
-        const expression = (0, jsonata_1.default)(jsonQueryExpression);
-        const status = await expression.evaluate({
+        const status = await evaluateJsonata(jsonQueryExpression, {
             value: response.toString(),
             expected: expectedValue.toString(),
         });

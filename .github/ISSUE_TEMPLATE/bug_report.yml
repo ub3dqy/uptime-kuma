@@ -1,152 +1,45 @@
----
-name: 🐛 Bug Report
-description: |
-  Submit a bug report to help us improve
-#title: "[Bug]"
+name: "Bug report / Ошибка"
+description: "Report something that went wrong / Расскажите, что пошло не так"
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        🚫 **We kindly ask you to refrain from pinging maintainers unless absolutely necessary. Pings are reserved for critical/urgent issues that require immediate attention.**
+        Please [search existing reports](https://github.com/ub3dqy/uptime-kuma/issues?q=is%3Aissue) first.
+        Убедитесь, что [такой ошибки ещё нет](https://github.com/ub3dqy/uptime-kuma/issues?q=is%3Aissue).
 
-  - type: textarea
-    id: related-issues
-    validations:
-      required: true
-    attributes:
-      label: 📑 I have found these related issues/pull requests
-      description: |
-        Please search for related **[ISSUES](https://github.com/louislam/uptime-kuma/issues?q=is%3Aissue%20sort%3Acreated-desc)**
-        and **[PULL REQUESTS](https://github.com/louislam/uptime-kuma/pulls?q=is%3Apr+sort%3Acreated-desc+)**.
-        Explain the differences between them or clarify if you were unable to find any related issues/pull requests.
-      placeholder: |
-        Example: This relates to issue #1, which also affects the ... system. It should not be merged because ...
-
-  - type: checkboxes
-    id: security-policy
-    attributes:
-      label: 🛡️ Security Policy
-      description: |
-        Please review and acknowledge the Security Policy before reporting any security-related issues or bugs. You can find the full Security Policy **[HERE](https://github.com/louislam/uptime-kuma/security/policy)**.
-      options:
-        - label: |
-            I have read and agree to Uptime Kuma's [Security Policy](https://github.com/louislam/uptime-kuma/security/policy).
-          required: true
-
-  - type: textarea
-    id: description
-    validations:
-      required: false
-    attributes:
-      label: 📝 Description
-      description: |
-        You could also upload screenshots
-
-  - type: textarea
-    id: steps-to-reproduce
-    validations:
-      required: true
-    attributes:
-      label: 👟 Reproduction steps
-      description: |
-        How do you trigger this bug? Please walk us through it step by step. Include all important details and add screenshots where appropriate
-      placeholder: |
-        ...
-
-  - type: textarea
-    id: expected-behavior
-    validations:
-      required: true
-    attributes:
-      label: 👀 Expected behavior
-      description: |
-        What did you think would happen?
-      placeholder: |
-        ...
-
-  - type: textarea
-    id: actual-behavior
-    validations:
-      required: true
-    attributes:
-      label: 😓 Actual Behavior
-      description: |
-        What actually happen?
-      placeholder: |
-        ...
-
+        Reports are public. Remove passwords, tokens, and private addresses from logs and screenshots.
+        Отчёты общедоступны. Уберите пароли, токены и закрытые адреса из журналов и снимков экрана.
   - type: input
-    id: uptime-kuma-version
+    id: version
     attributes:
-      label: 🐻 Uptime-Kuma Version
-      description: |
-        What version of Uptime-Kuma are you running? Please do not provide Docker tags like `latest` or `1`.
-      placeholder: |
-        e.g., 1.23.16 or 2.0.0-beta.2
+      label: "Version and setup / Версия и установка"
+      description: "Include the Kuma version, operating system, and how you installed it / Укажите версию Kuma, систему и способ установки"
+      placeholder: "2.5.8-ub3dqy.preview.1, Docker, Linux x86-64"
     validations:
       required: true
-
-  - type: input
-    id: operating-system
-    attributes:
-      label: 💻 Operating System and Arch
-      description: |
-        Which OS is your server/device running on? (For Replit, please do not
-        report this bug)
-      placeholder: |
-        e.g., Ubuntu Server 24.04.2 LTS (GNU/Linux 6.8.0-55-generic x86_64)
-    validations:
-      required: true
-
-  - type: input
-    id: browser-vendor
-    attributes:
-      label: 🌐 Browser
-      description: |
-        Which browser are you running on?
-      placeholder: |
-        e.g., Google Chrome 134.0.6998.183 (Official Build) (64-bit)
-    validations:
-      required: true
-
   - type: textarea
-    id: deployment-info
+    id: steps
     attributes:
-      label: 🖥️ Deployment Environment
-      description: |
-        Provide details about the deployment environment, including runtime components, databases, and storage configurations. This will
-        help assess the infrastructure and identify any potential compatibility requirements.
-
-        **Remove any fields that do not apply to your setup.**
-      value: |
-        - **Runtime Environment**:
-          - Docker: Version `X.X.X` (Build `Y.Y.Y`)
-          - Docker Compose: Version `X.X.X`
-          - Portainer (BE/CE): Version `X.X.X` (LTS: Yes/No)
-          - MariaDB: Version `X.X.X` (LTS: Yes/No)
-          - Node.js: Version `X.X.X` (LTS: Yes/No)
-          - Kubernetes (K3S/K8S): Version `X.X.X` (LTS: Yes/No, via `[method/tool]`)
-        - **Database**:
-          - SQLite: Embedded
-          - MariaDB: Embedded/External
-        - **Database Storage**:
-          - **Filesystem**:
-            - Linux: ext4/XFS/Btrfs/ZFS/F2FS
-            - macOS: APFS/ HFS+
-            - Windows: NTFS/ReFS
-          - **Storage Medium**: HDD/eMMC/SSD/NVMe
-        - **Uptime Kuma Setup**:
-          - Number of monitors: `X`
+      label: "Steps to reproduce / Как повторить"
+      description: "List the steps starting from a working setup / Опишите шаги с момента, когда всё работало"
     validations:
       required: true
-
   - type: textarea
-    id: logs
+    id: expected
     attributes:
-      label: 📝 Relevant log output
-      description: |
-        Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: bash session
+      label: "Expected result / Что ожидали"
     validations:
-      required: false
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Actual result / Что получилось"
+      description: "Include the error text if you saw one / Если увидели сообщение об ошибке, приведите его текст"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Logs or screenshots / Журнал или снимки экрана"
+      description: "Optional. Share only the relevant excerpt with private details removed / Необязательно. Достаточно нужного фрагмента без личных данных"

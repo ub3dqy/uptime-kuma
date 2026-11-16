@@ -1,70 +1,27 @@
----
-name: 🚀 Feature Request
-description: |
-  Submit a proposal for a new feature
-# title: "[Feature]"
-labels: ["feature-request"]
+name: "Suggestion / Предложение"
+description: "Tell us what would make Kuma more useful / Расскажите, что сделало бы Kuma полезнее"
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        ### 🚫 Please Avoid Unnecessary Pinging of Maintainers
-
-        We kindly ask you to refrain from pinging maintainers unless absolutely necessary.
-        Pings are for critical/urgent pull requests that require immediate attention.
+        Please [search existing suggestions](https://github.com/ub3dqy/uptime-kuma/issues?q=is%3Aissue+label%3Aenhancement) first.
+        Проверьте, [есть ли уже такое предложение](https://github.com/ub3dqy/uptime-kuma/issues?q=is%3Aissue+label%3Aenhancement).
   - type: textarea
-    id: related-issues
+    id: task
+    attributes:
+      label: "What are you trying to do? / Какую задачу вы решаете?"
+      description: "Describe a real situation and where the current version gets in the way / Опишите ситуацию и что мешает в текущей версии"
     validations:
       required: true
-    attributes:
-      label: 📑 I have found these related issues/pull requests
-      description: |
-        Please search for related **[ISSUES](https://github.com/louislam/uptime-kuma/issues?q=is%3Aissue%20sort%3Acreated-desc)**
-        and **[PULL REQUESTS](https://github.com/louislam/uptime-kuma/pulls?q=is%3Apr+sort%3Acreated-desc+)**.
-        Explain the differences between them or clarify if you were unable to find any related issues/pull requests.
-      placeholder: |
-        Example: This relates to issue #1, which also affects the ... system. It should not be merged because ...
-
   - type: textarea
-    id: feature-description
+    id: outcome
+    attributes:
+      label: "What would help? / Что бы помогло?"
+      description: "Tell us what you would like to be able to do / Расскажите, какой результат вам нужен"
     validations:
       required: true
-    attributes:
-      label: 🔖 Feature description
-      description: |
-        A clear and concise description of what the feature request is.
-      placeholder: |
-        You should add ...
-
   - type: textarea
-    id: solution
-    validations:
-      required: true
+    id: workaround
     attributes:
-      label: ✔️ Solution
-      description: |
-        A clear and concise description of what you want to happen.
-      placeholder: |
-        In my use-case, ...
-
-  - type: textarea
-    id: alternatives
-    validations:
-      required: false
-    attributes:
-      label: ❓ Alternatives
-      description: |
-        A clear and concise description of any alternative solutions or features you've considered.
-      placeholder: |
-        I have considered ...
-
-  - type: textarea
-    id: additional-context
-    validations:
-      required: false
-    attributes:
-      label: 📝 Additional Context
-      description: |
-        Add any other context or screenshots about the feature request here.
-      placeholder: |
-        ...
+      label: "How do you do it today? / Как вы решаете эту задачу сейчас?"
