@@ -41,9 +41,11 @@ Choose a page and set the steps a visitor would take. A simple example clicks a 
 
 ### A client report
 
-Select the sites under **Reports**, choose the period and click **Print / save PDF**. The report gives the coverage of the selected period and the outcome for each individual site.
+Group a client’s sites under **Reports**, choose the dates and open the report. The summary shows the overall figures, followed by the results for each site. Use **Print / save PDF** to save a copy.
 
 ![Client report showing availability and observation coverage](docs/media/report-en.png)
+
+[Watch how to create a report · 17 seconds](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/report-demo-en.mp4)
 
 ## Quick start
 
