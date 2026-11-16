@@ -1,85 +1,87 @@
 # Uptime Kuma · ub3dqy
 
-**Мониторинг сайтов и сервисов на своём сервере.** Видно, что работает, где возник сбой и успел ли кто-то на него отреагировать.
+[Читать на русском](README.ru.md)
 
-Главная страница магазина открывается, а покупатель нажимает «Оформить заказ» и видит ошибку. Kuma проходит заданный путь в браузере, показывает шаг, на котором он оборвался, и сохраняет снимок страницы. В той же панели можно посмотреть, что происходило до сбоя, и подготовить отчёт для клиента. Второй сервер может перепроверить сайт из другой сети, а важное оповещение ждёт подтверждения в Telegram.
+**Website and service monitoring on your own server.** See what is working, where a failure happened, and whether someone acknowledged it.
 
-[Скачать пробный выпуск](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Как запустить](#быстрый-запуск) · [Read in English](README.en.md)
+A shop's front page can look fine while the checkout link leads to an error. Kuma follows the steps in a browser, records where the journey stopped, and saves a screenshot. The same dashboard shows what happened before the failure and gives you a report you can send to the client. A second server can check the site from another network, and critical alerts can wait for acknowledgement in Telegram.
 
-![Рабочая панель Uptime Kuma со списком сайтов, состояниями и графиками отклика](docs/media/overview-ru.png)
+[Download the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Quick start](#quick-start)
 
-*Рабочая панель обновлённой Kuma. Сайты и история на снимке демонстрационные.*
+![Uptime Kuma dashboard showing website checks, their states, and response charts](docs/media/overview-en.png)
 
-## Что умеет Kuma
+*The updated Kuma dashboard with sample sites and observation history.*
 
-| Задача | Что есть в программе |
+## What you can do
+
+| Task | What Kuma offers |
 | --- | --- |
-| Следить за сайтами и сервисами | Проверки HTTP(S), текста в ответе, пинга, портов, DNS, WebSocket, контейнеров и баз данных. Сервисы и задания могут сами отмечаться через push-проверку. В панели видны состояния, время ответа, история и срок действия сертификата. |
-| Проверить путь пользователя | Браузер открывает страницу, нажимает элемент по видимому тексту и проверяет, появился ли ожидаемый текст. При сбое сохраняются номер шага и снимок страницы. |
-| Перепроверить сбой из другой сети | Независимый наблюдатель на втором сервере проверяет сайт и присылает своё наблюдение. Можно увидеть, доступен ли сайт из другой точки. |
-| Довести важное оповещение до человека | Telegram, почта и другие каналы. Если Telegram отклонит важное оповещение или за пять минут никто не нажмёт «Принял», Kuma отправит письмо на заранее проверенный адрес. В журнале видно, принял ли канал сообщение и подтвердил ли его человек. |
-| Управлять проверками с телефона | В Telegram можно посмотреть состояние и историю, поставить проверку на паузу, возобновить её и подтвердить оповещение. Доступ определяется ролью пользователя. |
-| Раздать доступ команде | Проверки, каналы и действия собраны в проектах. Наблюдатель смотрит данные, оператор выполняет разрешённые действия, администратор управляет доступом. |
-| Разобраться в причине сбоя | После подключения «Личный ИИ» собирает разрешённые наблюдения, показывает факты и предлагает, что перепроверить. Для выбранных проверок можно запускать диагностику по событию. |
-| Восстановить управляемый сайт | При подключённом исполнителе владелец видит план, подтверждает действие и проверяет результат по новым наблюдениям. Сценарии с переносом исправления требуют отдельных настроек доступа и отката. |
-| Отчитаться перед заказчиком | Соберите сайты по клиентам, выберите период и сохраните отчёт в PDF. В отчёте отдельно видны простой, обслуживание и время без наблюдений. Историю проверок можно выгрузить в CSV. |
-| Сообщить о работах посетителям | Публичные страницы состояния показывают доступность сервисов, сообщения об инцидентах и запланированное обслуживание. |
+| Monitor sites and services | Check HTTP(S), response text, ping, ports, DNS, WebSockets, containers and databases. Jobs and services can report in through push checks. See state, response time, history and certificate expiry in the dashboard. |
+| Follow a user's journey | Open a page in a browser, click an element by its visible text and check for the expected text. When a step fails, Kuma records the step number and a screenshot. |
+| Check from a second network | An independent observer on another server makes its own request. See whether that location also saw a problem. |
+| Get critical alerts to a person | Send alerts through Telegram, email and other channels. If Telegram rejects a critical alert or nobody acknowledges it within five minutes, Kuma sends an email to a tested address. The delivery history shows provider acceptance and human acknowledgement. |
+| Check in from your phone | Use Telegram to see state and recent history, pause or resume a check, and acknowledge an alert. Access follows the user's project role. |
+| Give teammates the right access | Keep checks, channels and actions in projects. Observers can view data, operators can take permitted actions, and administrators manage access. |
+| Investigate an incident | When connected, personal diagnostics uses the observations you allow, presents the evidence and suggests what to check next. Selected checks can request diagnostics after an incident. |
+| Recover a managed site | With a recovery worker configured, the owner can review a plan, approve an action and check the outcome against new observations. Deploying a code repair requires separately configured access and rollback. |
+| Report to a client | Group sites by client, choose a period and save a printable PDF. The report shows outages, maintenance and gaps in observations. Export retained check history as CSV. |
+| Communicate planned work | Public status pages show service availability, incident messages and scheduled maintenance. |
 
-## Как это выглядит в работе
+## A look around the application
 
-### История сайта
+### The history behind a check
 
-Раскройте строку сайта на панели, чтобы увидеть время ответа и сбои на одном графике. Пропуск остаётся разрывом. При наведении, касании или выборе с клавиатуры видно время и результат проверки.
+Expand a row to see response times and failures in the same chart. Gaps remain visible. Hover, tap or use the keyboard to inspect individual observations.
 
-![Раскрытая строка сайта с графиком отклика и отметками о сбое](docs/media/observations-ru.png)
+![Expanded website row showing an observation chart and failed checks](docs/media/observations-en.png)
 
-### Проверка в браузере
+### A browser check
 
-Укажите страницу и шаги, которые обычно проходит посетитель. Для примера достаточно двух действий: нажать «Оформить заказ» и убедиться, что появилась надпись «Адрес доставки».
+Choose a page and set the steps a visitor would take. A simple example clicks a checkout link and checks whether the delivery address label appears.
 
-![Настройка браузерной проверки с двумя шагами](docs/media/journey-ru.png)
+![Browser monitor form with two steps](docs/media/journey-en.png)
 
-### Отчёт для клиента
+### A client report
 
-Соберите сайты клиента в группу в разделе **Отчёты**. Выберите период и откройте отчёт. Наверху видна общая картина, ниже — результаты по каждому сайту. Готовый отчёт можно сохранить через **Печать / сохранить PDF**.
+Group a client’s sites under **Reports**, choose the dates and open the report. The summary shows the overall figures, followed by the results for each site. Use **Print / save PDF** to save a copy.
 
-![Отчёт по клиенту с доступностью и долей периода с наблюдениями](docs/media/report-ru.png)
+![Client report showing availability and observation coverage](docs/media/report-en.png)
 
-[Посмотреть, как сделать отчёт · 17 секунд](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/report-demo-ru.mp4)
+[Watch how to create a report · 17 seconds](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/report-demo-en.mp4)
 
-## Быстрый запуск
+## Quick start
 
-Готовый архив рассчитан на **Docker с Linux x86‑64**. Для первой пробы заведите отдельную установку с чистой базой SQLite.
+The ready-to-run archive uses **Docker with Linux x86‑64 containers**. Start with a separate installation and a fresh SQLite database.
 
-1. Скачайте `kuma-preview-linux-amd64.tar.gz` и `SHA256SUMS.txt` на [странице выпуска](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2). Проверьте контрольную сумму архива.
-2. В папке с архивом выполните:
+1. Download `kuma-preview-linux-amd64.tar.gz` and `SHA256SUMS.txt` from the [release page](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2), then verify the checksum.
+2. In the download directory, run:
 
    ```sh
    docker load -i kuma-preview-linux-amd64.tar.gz
    docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.2
    ```
 
-3. Откройте <http://127.0.0.1:3001>, выберите **SQLite**, создайте администратора и добавьте первый сайт.
-4. Для знакомства с возможностями добавьте два сайта в отчёт по клиенту. Для проверки браузера выберите страницу с безопасными действиями, например переход по ссылке и проверку заголовка.
+3. Open <http://127.0.0.1:3001>, select **SQLite**, create an administrator and add a website.
+4. Try a report with two checks. For a first browser check, choose a page where you can safely follow a link and look for a heading.
 
-[Установка, проверка архива и запуск из исходного кода](FORK.ru.md#установка) · [Отчёты и выгрузка](FORK.ru.md#клиенты-и-печатные-отчёты)
+[Full installation and checksum instructions](FORK.md#installation) · [Reports and history export](FORK.md#client-groups-and-printable-reports)
 
-Пробная сборка хранит данные в отдельном томе. Если уже используете Kuma, проверьте переход на копии данных. Проверки с выражениями JSONata в готовом архиве отключены. Для второго наблюдателя, управления из Telegram, диагностики и восстановления нужна отдельная настройка.
+The preview stores data in a separate Docker volume. If you already run Kuma, test the move on a copy of your data. JSONata expression checks are disabled in the archive. Independent observers, Telegram control, diagnostics and recovery require separate configuration.
 
-## Руководства
+## Guides
 
-- [Подтверждение оповещений и управление из Telegram](docs/TELEGRAM-CONTROL.ru.md)
-- [Как подключить наблюдателя на втором сервере](deploy/witness/README.ru.md#проверка-сайтов-со-второго-сервера)
-- [Проекты, роли и подключение диагностики](docs/PROJECTS-AND-AI.ru.md)
-- [Диагностика по событию](docs/EVENT-DIAGNOSIS.ru.md)
-- [Восстановление с подтверждением владельца](docs/APPROVED-RECOVERY.ru.md)
+- [Telegram alerts and controls](docs/TELEGRAM-CONTROL.ru.md) (Russian)
+- [Independent observer setup](deploy/witness/README.ru.md) (Russian)
+- [Project roles and diagnostics](docs/PROJECTS-AND-AI.ru.md) (Russian)
+- [Incident diagnostics](docs/EVENT-DIAGNOSIS.ru.md) (Russian)
+- [Owner-approved recovery](docs/APPROVED-RECOVERY.ru.md) (Russian)
 
-## Обратная связь
+## Feedback
 
-Если проверка дала неожиданный результат, укажите версию, шаги и что получилось. Если не хватает возможности, опишите задачу, которую сейчас приходится решать вручную.
+If you find a bug, include the version, the steps and what happened. If an improvement would help, describe the task you are trying to do and how you work around it today.
 
-[Сообщить об ошибке](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Предложить улучшение](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml) · [Сообщить об уязвимости приватно](https://github.com/ub3dqy/uptime-kuma/security/advisories/new)
+[Report a bug](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Suggest an improvement](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml) · [Report a vulnerability privately](https://github.com/ub3dqy/uptime-kuma/security/advisories/new)
 
-Самостоятельная версия [Uptime Kuma](https://github.com/louislam/uptime-kuma) на основе 2.5.8. Оригинальный проект создали Louis Lam и участники сообщества. Лицензия [MIT](LICENSE).
+An independent edition based on [Uptime Kuma](https://github.com/louislam/uptime-kuma) 2.5.8 by Louis Lam and contributors. [MIT license](LICENSE).
 
 Dima Mak / [ub3dqy](https://github.com/ub3dqy)

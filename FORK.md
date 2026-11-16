@@ -2,7 +2,7 @@
 
 Monitor client websites on your own server, see when they were down, and share a printable report for each client.
 
-[Try the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Product overview](README.en.md) · [Русская версия](FORK.ru.md)
+[Try the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Product overview](README.md) · [Русская версия](FORK.ru.md)
 
 This independent preview is based on Uptime Kuma 2.5.8, originally created by Louis Lam and contributors. It is maintained by Dima Mak / ub3dqy and uses the MIT license.
 

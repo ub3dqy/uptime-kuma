@@ -2,7 +2,7 @@
 
 Следите за сайтами клиентов на своём сервере, смотрите простои и готовьте отчёт для каждого заказчика.
 
-[Попробовать сборку](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Возможности и снимки экрана](README.md) · [English](FORK.md)
+[Попробовать сборку](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Возможности и снимки экрана](README.ru.md) · [English](FORK.md)
 
 Пробная версия основана на Uptime Kuma 2.5.8, которую создали Louis Lam и участники исходного проекта. Эту версию поддерживает Dima Mak / ub3dqy. Лицензия MIT сохранена.
 
