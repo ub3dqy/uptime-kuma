@@ -6,11 +6,13 @@
 
 Главная страница магазина открывается, а покупатель нажимает «Оформить заказ» и видит ошибку. Kuma проходит заданный путь в браузере, показывает шаг, на котором он оборвался, и сохраняет снимок страницы. В той же панели можно посмотреть, что происходило до сбоя, и подготовить отчёт для клиента. Второй сервер может перепроверить сайт из другой сети, а важное оповещение ждёт подтверждения в Telegram.
 
-[Скачать пробный выпуск](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Как запустить](#быстрый-запуск)
+[![Рабочая панель Uptime Kuma с двумя тестовыми сайтами, один работает, другой недоступен](docs/media/pilot-overview-ru.png)](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/pilot-demo-ru.mp4)
 
-![Рабочая панель Uptime Kuma со списком сайтов, состояниями и графиками отклика](docs/media/overview-ru.png)
+[Посмотреть минутное демо](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/pilot-demo-ru.mp4) · [Открыть пример отчёта в PDF](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/client-report-ru.pdf)
 
-*Рабочая панель обновлённой Kuma. Сайты и история на снимке демонстрационные.*
+[![Попробовать](docs/media/pilot-try-ru.png)](#быстрый-запуск)
+[![Сообщить об ошибке](docs/media/pilot-bug-ru.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml)
+[![Предложить идею](docs/media/pilot-idea-ru.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
 ## Что умеет Kuma
 
@@ -46,8 +48,6 @@
 Соберите сайты клиента в группу в разделе **Отчёты**. Выберите период и откройте отчёт. Наверху видна общая картина, ниже — результаты по каждому сайту. Готовый отчёт можно сохранить через **Печать / сохранить PDF**.
 
 ![Отчёт по клиенту с доступностью и долей периода с наблюдениями](docs/media/report-ru.png)
-
-[Посмотреть, как сделать отчёт · 17 секунд](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/report-demo-ru.mp4)
 
 ## Быстрый запуск
 

@@ -6,11 +6,13 @@
 
 A shop's front page can look fine while the checkout link leads to an error. Kuma follows the steps in a browser, records where the journey stopped, and saves a screenshot. The same dashboard shows what happened before the failure and gives you a report you can send to the client. A second server can check the site from another network, and critical alerts can wait for acknowledgement in Telegram.
 
-[Download the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Quick start](#quick-start)
+[![Uptime Kuma showing two sample sites, one healthy and one unavailable](docs/media/pilot-overview-en.png)](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/pilot-demo-en.mp4)
 
-![Uptime Kuma dashboard showing website checks, their states, and response charts](docs/media/overview-en.png)
+[Watch the one-minute demo](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/pilot-demo-en.mp4) · [Open the sample PDF](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/client-report-en.pdf)
 
-*The updated Kuma dashboard with sample sites and observation history.*
+[![Try it](docs/media/pilot-try-en.png)](#quick-start)
+[![Report a bug](docs/media/pilot-bug-en.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml)
+[![Suggest an idea](docs/media/pilot-idea-en.png)](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
 ## What you can do
 
@@ -46,8 +48,6 @@ Choose a page and set the steps a visitor would take. A simple example clicks a 
 Group a client’s sites under **Reports**, choose the dates and open the report. The summary shows the overall figures, followed by the results for each site. Use **Print / save PDF** to save a copy.
 
 ![Client report showing availability and observation coverage](docs/media/report-en.png)
-
-[Watch how to create a report · 17 seconds](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.2/report-demo-en.mp4)
 
 ## Quick start
 
