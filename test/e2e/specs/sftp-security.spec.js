@@ -14,7 +14,7 @@ test("SFTP requires a host fingerprint and preserves it across creation and edit
         await page.getByTestId("hostname-input").fill("127.0.0.1");
         await page.locator("#port").fill(String(peer.address().port));
         await page.locator("#ssh_username").fill("local-fixture");
-        await page.locator("#ssh_password input").fill("local-fixture");
+        await page.getByLabel("Password", { exact: true }).fill("local-fixture");
         const field = page.locator("#ssh_host_key_fingerprint");
         expect(await field.evaluate((input) => input.checkValidity())).toBe(false);
         await field.fill("invalid fingerprint");

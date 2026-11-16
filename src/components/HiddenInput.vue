@@ -1,6 +1,7 @@
 <template>
     <div class="input-group mb-3">
         <input
+            v-bind="$attrs"
             ref="input"
             v-model="model"
             :type="visibility"
@@ -12,17 +13,20 @@
             :readonly="readonly"
         />
 
-        <a v-if="visibility == 'password'" class="btn btn-outline-primary" @click="showInput()">
-            <font-awesome-icon icon="eye" />
-        </a>
-        <a v-if="visibility == 'text'" class="btn btn-outline-primary" @click="hideInput()">
-            <font-awesome-icon icon="eye-slash" />
-        </a>
+        <button
+            type="button"
+            class="btn btn-outline-primary"
+            :aria-label="$t(visibility === 'password' ? 'workspaceRevealValue' : 'workspaceConcealValue')"
+            @click="visibility = visibility === 'password' ? 'text' : 'password'"
+        >
+            <font-awesome-icon :icon="visibility === 'password' ? 'eye' : 'eye-slash'" aria-hidden="true" />
+        </button>
     </div>
 </template>
 
 <script>
 export default {
+    inheritAttrs: false,
     props: {
         /** The value of the input */
         modelValue: {
@@ -68,23 +72,6 @@ export default {
             set(value) {
                 this.$emit("update:modelValue", value);
             },
-        },
-    },
-    created() {},
-    methods: {
-        /**
-         * Show users input in plain text
-         * @returns {void}
-         */
-        showInput() {
-            this.visibility = "text";
-        },
-        /**
-         * Censor users input
-         * @returns {void}
-         */
-        hideInput() {
-            this.visibility = "password";
         },
     },
 };

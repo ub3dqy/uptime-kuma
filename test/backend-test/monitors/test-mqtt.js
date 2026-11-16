@@ -68,7 +68,8 @@ async function testMqtt(
 describe(
     "MqttMonitorType",
     {
-        concurrency: 2,
+        // Each case starts its own broker; avoid concurrent broker startup on the same test host.
+        concurrency: 1,
         skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
     },
     () => {

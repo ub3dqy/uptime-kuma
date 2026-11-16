@@ -7,7 +7,7 @@ const {
     sendHttpError,
 } = require("../util-server");
 const { R } = require("redbean-node");
-const apicache = require("../modules/apicache");
+const responseCache = require("../utils/response-cache");
 const Monitor = require("../model/monitor");
 const dayjs = require("dayjs");
 const { UP, MAINTENANCE, DOWN, PENDING, flipStatus, log, badgeConstants } = require("../../src/util");
@@ -20,7 +20,7 @@ const { Settings } = require("../settings");
 
 let router = express.Router();
 
-let cache = apicache.middleware;
+let cache = responseCache.middleware;
 const server = UptimeKumaServer.getInstance();
 let io = server.io;
 
@@ -132,6 +132,7 @@ router.all("/api/push/:pushToken", async (request, response) => {
         }
         await R.store(bean);
 
+        await Monitor.flushManagedNotifications(monitor, bean);
         io.to(monitor.user_id).emit("heartbeat", bean.toJSON());
 
         Monitor.sendStats(io, monitor.id, monitor.user_id);

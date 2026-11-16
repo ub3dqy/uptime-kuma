@@ -47,6 +47,7 @@ export default defineConfig({
         },
         {
             name: "specs",
+            testIgnore: /(?:workspace|client-groups|heartbeat-export|stage2-workflow|stage3-projects|stage4-recovery|site-work|site-recovery|code-recovery)\.spec\.js$/,
             use: { ...devices["Desktop Chrome"] },
             dependencies: ["run-once setup"],
         },
@@ -59,7 +60,7 @@ export default defineConfig({
 
     // Run your local dev server before starting the tests.
     webServer: {
-        command: `node extra/remove-playwright-test-data.js && cross-env NODE_ENV=development node server/server.js --port=${port} --data-dir=./data/playwright-test`,
+        command: `node extra/remove-playwright-test-data.js && cross-env NODE_ENV=development node server/server.js --host=localhost --port=${port} --data-dir=./data/playwright-test`,
         url,
         reuseExistingServer: false,
         cwd: "../",

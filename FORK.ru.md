@@ -2,7 +2,7 @@
 
 Следите за сайтами клиентов на своём сервере, смотрите простои и готовьте отчёт для каждого заказчика.
 
-[Попробовать сборку](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.1) · [Посмотреть демо отчёта](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.1/demo-report.mp4) · [English](FORK.md)
+[Попробовать сборку](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Возможности и снимки экрана](README.md) · [English](FORK.md)
 
 Пробная версия основана на Uptime Kuma 2.5.8, которую создали Louis Lam и участники исходного проекта. Эту версию поддерживает Dima Mak / ub3dqy. Лицензия MIT сохранена.
 
@@ -10,16 +10,16 @@
 
 Для пробы запустите отдельную установку с чистой базой. Готовый архив рассчитан на Docker с контейнерами Linux x86-64. В Docker Desktop нужен режим Linux-контейнеров. В примере используется SQLite.
 
-1. Скачайте файлы `kuma-preview-linux-amd64.tar.gz` и `SHA256SUMS.txt` со [страницы пробного выпуска](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.1). Сравните SHA-256 архива со значением в списке. В Linux выполните `sha256sum kuma-preview-linux-amd64.tar.gz`, в PowerShell — `Get-FileHash .\kuma-preview-linux-amd64.tar.gz`.
+1. Скачайте файлы `kuma-preview-linux-amd64.tar.gz` и `SHA256SUMS.txt` со [страницы пробного выпуска](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2). Сравните SHA-256 архива со значением в списке. В Linux выполните `sha256sum kuma-preview-linux-amd64.tar.gz`, в PowerShell — `Get-FileHash .\kuma-preview-linux-amd64.tar.gz`.
 2. В папке с архивом выполните:
 
    ```sh
    docker load -i kuma-preview-linux-amd64.tar.gz
-   docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.1
+   docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.2
    ```
 
 3. Откройте <http://127.0.0.1:3001>, выберите **SQLite** и создайте учётную запись администратора. Для доступа к удалённому серверу можно открыть туннель `ssh -N -L 3001:127.0.0.1:3001 user@server`. Если порт 3001 занят на машине с Docker, замените первое число 3001 в команде запуска и откройте выбранный порт в браузере.
-4. Добавьте две проверки HTTP(S). В разделе **Клиенты** назовите группу, отметьте обе проверки и сохраните её. Когда накопится история, выберите период и нажмите **Открыть отчёт за период**, затем **Печать / сохранить PDF**.
+4. Добавьте две проверки HTTP(S). В разделе **Отчёты** назовите группу, отметьте обе проверки и сохраните её. Когда накопится история, выберите период и нажмите **Открыть отчёт за период**, затем **Печать / сохранить PDF**.
 
 Для первой пробы выберите недавний период. Отчёт использует сохранённую историю и показывает, за какую часть периода есть наблюдения. Промежутки без данных помечаются отдельно.
 
@@ -27,7 +27,7 @@
 
 В готовой пробной сборке отключены проверки с JSONata, в том числе сохранённые выражения. Для пробы используйте обычные проверки HTTP(S).
 
-**Сборка из исходного кода.** Нужен Node.js 24.22.3 LTS или новее из ветки 24.x. Клонируйте версию `v2.5.8-ub3dqy.preview.1` и выполните `npm run setup` в её папке. В Linux запустите `UPTIME_KUMA_DISABLE_JSONATA=1 node server/server.js --host=127.0.0.1 --port=3001`. В PowerShell перед той же командой `node` выполните `$env:UPTIME_KUMA_DISABLE_JSONATA = '1'`.
+**Сборка из исходного кода.** Нужны Node.js 24.22.3 LTS или новее из ветки 24.x и npm 12.2.1. Клонируйте версию `v2.5.8-ub3dqy.preview.2` и выполните `npm run setup` в её папке. В Linux запустите `UPTIME_KUMA_DISABLE_JSONATA=1 node server/server.js --host=127.0.0.1 --port=3001`. В PowerShell перед той же командой `node` выполните `$env:UPTIME_KUMA_DISABLE_JSONATA = '1'`.
 
 [Сообщить об ошибке](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Предложить улучшение](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
@@ -95,7 +95,7 @@
 
 ## Клиенты и печатные отчёты
 
-Откройте **Клиенты** в верхнем меню. На телефоне ссылка находится в настройках.
+Откройте **Отчёты** в верхнем меню. На телефоне ссылка находится в настройках.
 Создайте группу клиента, выберите отдельные проверки и сохраните. Одна проверка
 может относиться к нескольким клиентам; вложенные группы автоматически не
 добавляются. Прежние группы проверок не меняются. Это организация внутри вашей

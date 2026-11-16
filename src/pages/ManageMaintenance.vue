@@ -1,16 +1,13 @@
 <template>
     <transition name="slide-fade" appear>
-        <div>
-            <h1 class="mb-3">
-                {{ $t("Maintenance") }}
-            </h1>
-
-            <div>
-                <router-link to="/add-maintenance" class="btn btn-primary mb-3">
-                    <font-awesome-icon icon="plus" />
+        <div class="maintenance-page">
+            <header class="maintenance-heading mb-3">
+                <h1>{{ $t("Maintenance") }}</h1>
+                <router-link to="/add-maintenance" class="ws-button ws-button-primary">
+                    <font-awesome-icon icon="plus" aria-hidden="true" />
                     {{ $t("Schedule Maintenance") }}
                 </router-link>
-            </div>
+            </header>
 
             <div class="shadow-box">
                 <span
@@ -20,12 +17,12 @@
                     {{ $t("No Maintenance") }}
                 </span>
 
-                <div v-for="(item, index) in sortedMaintenanceList" :key="index" class="item" :class="item.status">
+                <div v-for="item in sortedMaintenanceList" :key="item.id" class="item" :class="item.status">
                     <div class="left-part">
-                        <div class="circle"></div>
+                        <div class="circle" aria-hidden="true"></div>
                         <div class="info">
                             <div class="title">{{ item.title }}</div>
-                            <div class="status">
+                            <div class="maintenance-state">
                                 {{ $t("maintenanceStatus-" + item.status) }}
                             </div>
 
@@ -34,10 +31,11 @@
                     </div>
 
                     <div class="buttons">
-                        <div class="btn-group" role="group">
+                        <div class="maintenance-actions" role="group" :aria-label="item.title">
                             <button
                                 v-if="item.active"
-                                class="btn btn-normal"
+                                type="button"
+                                class="ws-button ws-button-quiet"
                                 :aria-label="$t('ariaPauseMaintenance')"
                                 @click="pauseDialog(item.id)"
                             >
@@ -47,7 +45,8 @@
 
                             <button
                                 v-if="!item.active"
-                                class="btn btn-primary"
+                                type="button"
+                                class="ws-button ws-button-primary"
                                 :aria-label="$t('ariaResumeMaintenance')"
                                 @click="resumeMaintenance(item.id)"
                             >
@@ -57,7 +56,7 @@
 
                             <router-link
                                 :to="'/maintenance/clone/' + item.id"
-                                class="btn btn-normal"
+                                class="ws-button ws-button-quiet"
                                 :aria-label="$t('ariaCloneMaintenance')"
                             >
                                 <font-awesome-icon icon="clone" />
@@ -66,7 +65,7 @@
 
                             <router-link
                                 :to="'/maintenance/edit/' + item.id"
-                                class="btn btn-normal"
+                                class="ws-button ws-button-quiet"
                                 :aria-label="$t('ariaEditMaintenance')"
                             >
                                 <font-awesome-icon icon="edit" />
@@ -74,7 +73,8 @@
                             </router-link>
 
                             <button
-                                class="btn btn-normal text-danger"
+                                type="button"
+                                class="ws-button ws-button-quiet maintenance-delete"
                                 :aria-label="$t('ariaDeleteMaintenance')"
                                 @click="deleteDialog(item.id)"
                             >
@@ -221,118 +221,105 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../assets/vars.scss";
+.maintenance-page {
+    padding: clamp(12px, 3vw, 24px);
+}
 
-.mobile {
-    .item {
-        flex-direction: column;
-        align-items: flex-start;
-        margin-bottom: 20px;
-    }
+.maintenance-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.maintenance-heading h1 {
+    margin: 0;
+}
+
+.maintenance-page .shadow-box {
+    padding: clamp(12px, 2.5vw, 24px);
+    border: 1px solid var(--ws-border);
+    background: var(--ws-surface);
+    box-shadow: var(--ws-shadow);
 }
 
 .item {
+    --maintenance-state: var(--ws-muted);
+
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    text-decoration: none;
-    border-radius: 10px;
-    transition: all ease-in-out 0.15s;
     justify-content: space-between;
-    padding: 10px;
-    min-height: 90px;
-    margin-bottom: 5px;
-
-    &:hover {
-        background-color: $highlight-white;
-    }
-
-    &.under-maintenance {
-        background-color: rgba(23, 71, 245, 0.16);
-
-        &:hover {
-            background-color: rgba(23, 71, 245, 0.3) !important;
-        }
-
-        .circle {
-            background-color: $maintenance;
-        }
-    }
-
-    &.scheduled {
-        .circle {
-            background-color: $primary;
-        }
-    }
-
-    &.inactive {
-        .circle {
-            background-color: $danger;
-        }
-    }
-
-    &.ended {
-        .left-part {
-            opacity: 0.3;
-        }
-
-        .circle {
-            background-color: $dark-font-color;
-        }
-    }
-
-    &.unknown {
-        .circle {
-            background-color: $dark-font-color;
-        }
-    }
-
-    .left-part {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-
-        .circle {
-            width: 25px;
-            height: 25px;
-            border-radius: 50rem;
-        }
-
-        .info {
-            .title {
-                font-weight: bold;
-                font-size: 20px;
-            }
-
-            .status {
-                font-size: 14px;
-            }
-        }
-    }
-
-    .buttons {
-        display: flex;
-        gap: 8px;
-        flex-direction: row-reverse;
-
-        @media (max-width: 550px) {
-            & {
-                width: 100%;
-            }
-
-            .btn-group {
-                margin: 1em 1em 0 1em;
-                width: 100%;
-            }
-        }
-    }
+    gap: 14px;
+    padding-block: 16px;
+    overflow-wrap: anywhere;
 }
 
-.dark {
-    .item {
-        &:hover {
-            background-color: $dark-bg2;
-        }
+.item + .item {
+    border-top: 1px solid var(--ws-border);
+}
+
+.item.under-maintenance {
+    --maintenance-state: var(--trace-maintenance);
+}
+
+.item.scheduled {
+    --maintenance-state: var(--ws-action);
+}
+
+.item.inactive {
+    --maintenance-state: var(--ws-danger);
+}
+
+.left-part {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+}
+
+.circle {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--maintenance-state);
+}
+
+.title {
+    font-size: 17px;
+    font-weight: 680;
+}
+
+.maintenance-state {
+    color: var(--maintenance-state);
+    font-size: 14px;
+}
+
+.maintenance-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.maintenance-actions .ws-button {
+    padding-inline: 10px;
+    font-size: 14px;
+}
+
+.maintenance-delete {
+    color: var(--ws-danger);
+}
+
+@media (max-width: 640px) {
+    .buttons {
+        width: 100%;
+    }
+
+    .maintenance-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(122px, 100%), 1fr));
     }
 }
 </style>

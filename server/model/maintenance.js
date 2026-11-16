@@ -4,7 +4,7 @@ const { R } = require("redbean-node");
 const dayjs = require("dayjs");
 const { Cron } = require("../utils/maintenance-cron");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
-const apicache = require("../modules/apicache");
+const responseCache = require("../utils/response-cache");
 
 class Maintenance extends BeanModel {
     /**
@@ -234,7 +234,7 @@ class Maintenance extends BeanModel {
             this.beanMeta.job = new Cron(this.start_date, { timezone: await this.getTimezone() }, () => {
                 log.info("maintenance", "Maintenance id: " + this.id + " is under maintenance now");
                 UptimeKumaServer.getInstance().sendMaintenanceListByUserID(this.user_id);
-                apicache.clear();
+                responseCache.clear();
             });
         } else if (this.cron != null) {
             let current = dayjs();

@@ -13,7 +13,7 @@ const auth = require("../../server/auth");
 const passwordHash = require("../../server/password-hash");
 const { loginRateLimiter, apiRateLimiter } = require("../../server/rate-limiter");
 const Monitor = require("../../server/model/monitor");
-const apicache = require("../../server/modules/apicache");
+const responseCache = require("../../server/utils/response-cache");
 const { log } = require("../../src/util");
 
 /**
@@ -211,7 +211,7 @@ test("RSS cache keeps Host and forwarded origins isolated", async (context) => {
     }));
     const app = express();
     app.use(require("../../server/routers/status-page-router"));
-    context.after(() => apicache.clear());
+    context.after(() => responseCache.clear());
     const port = await listen(http.createServer(app), context);
     const first = await request(port, "/status/local/rss", { Host: "first.invalid" });
     const second = await request(port, "/status/local/rss", { Host: "owner.invalid" });
@@ -270,6 +270,7 @@ test("release preparation passes untrusted PR titles literally without a shell",
     const { syncBuiltinESMExports } = require("node:module");
     const title = 'fix: literal $(printf LOCAL_TEST) `printf LOCAL_TEST` "quotes"';
     const parent = path.resolve(__dirname, "../../private");
+    fs.mkdirSync(parent, { recursive: true });
     const directory = fs.mkdtempSync(path.join(parent, "release-cli-"));
     const packageRoot = path.join(directory, "node_modules", "opencode-ai");
     fs.mkdirSync(packageRoot, { recursive: true });

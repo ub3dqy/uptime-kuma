@@ -1,6 +1,6 @@
 # How to run
 
-Node.js 24.22.2 LTS (24.x)
+Node.js 24.22.3 LTS (24.x)
 
 ```bash
 node index.ts

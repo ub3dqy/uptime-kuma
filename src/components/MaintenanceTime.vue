@@ -5,12 +5,13 @@
         </div>
         <div v-else-if="maintenance.timeslotList.length > 0">
             <div class="timeslot">
-                {{ startDateTime }}
+                {{ startDateTime.format(dateFormat) }}
                 <span class="to">-</span>
-                {{ endDateTime }}
+                {{ endDateTime.format(dateFormat) }}
             </div>
             <div class="timeslot">
-                UTC{{ maintenance.timezoneOffset }}
+                UTC{{ startDateTime.format("Z") }}
+                <span v-if="startDateTime.utcOffset() !== endDateTime.utcOffset()">–UTC{{ endDateTime.format("Z") }}</span>
                 <span v-if="maintenance.timezone !== 'UTC'">{{ maintenance.timezone }}</span>
             </div>
         </div>
@@ -29,15 +30,22 @@ export default {
         },
     },
     computed: {
+        dateFormat: () => SQL_DATETIME_FORMAT_WITHOUT_SECOND,
         startDateTime() {
-            return dayjs(this.maintenance.timeslotList[0].startDate)
-                .tz(this.maintenance.timezone, true)
-                .format(SQL_DATETIME_FORMAT_WITHOUT_SECOND);
+            return this.inMaintenanceZone(this.maintenance.timeslotList[0].startDate);
         },
         endDateTime() {
-            return dayjs(this.maintenance.timeslotList[0].endDate)
-                .tz(this.maintenance.timezone, true)
-                .format(SQL_DATETIME_FORMAT_WITHOUT_SECOND);
+            return this.inMaintenanceZone(this.maintenance.timeslotList[0].endDate);
+        },
+    },
+    methods: {
+        /**
+         * @param {string} value Saved wall time for one-off windows, ISO instant for recurring windows.
+         * @returns {import("dayjs").Dayjs} Time in the configured maintenance zone.
+         */
+        inMaintenanceZone(value) {
+            const { strategy, timezone } = this.maintenance;
+            return strategy === "single" ? dayjs.tz(value, timezone) : dayjs(value).tz(timezone);
         },
     },
 };

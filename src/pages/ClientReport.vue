@@ -1,88 +1,118 @@
 <template>
-    <div class="client-report-page">
-        <div class="report-tools no-print d-flex flex-wrap gap-2 mb-4">
-            <router-link to="/clients" class="btn btn-normal">{{ $t("clientGroupsTitle") }}</router-link>
-            <button class="btn btn-normal" :disabled="loading || !ready" @click="loadReport">
-                {{ $t("Refresh") }}
-            </button>
-            <button class="btn btn-primary" :disabled="!report || loading" @click="printReport">
-                {{ $t("clientReportPrint") }}
-            </button>
+    <main class="workspace-shell client-report-shell" :class="{ dark: $root.isDark }">
+        <div class="client-report-page">
+            <div class="report-tools no-print d-flex flex-wrap gap-2 mb-4">
+                <router-link to="/clients" class="ws-button ws-button-quiet">{{ $t("clientGroupsTitle") }}</router-link>
+                <button
+                    type="button"
+                    class="ws-button ws-button-quiet"
+                    :disabled="loading || !ready"
+                    @click="loadReport"
+                >
+                    {{ $t("Refresh") }}
+                </button>
+                <button
+                    type="button"
+                    class="ws-button ws-button-primary"
+                    :disabled="!report || loading"
+                    @click="printReport"
+                >
+                    {{ $t("clientReportPrint") }}
+                </button>
+            </div>
+            <div v-if="!$root.loggedIn" class="no-print"><Login v-if="$root.allowLoginDialog" /></div>
+            <p v-if="loading" class="no-print" role="status">{{ $t("exportHistoryLoading") }}</p>
+            <p v-if="error" class="text-danger no-print" role="alert">{{ error }}</p>
+            <article v-if="report" data-testid="client-report">
+                <h1>{{ $t("clientReportTitle") }}: {{ report.client.name }}</h1>
+                <p class="report-range">
+                    <time :datetime="report.start">{{ utcDate(report.start) }}</time>
+                    —
+                    <time :datetime="report.end">{{ utcDate(report.end) }}</time>
+                </p>
+                <p class="small">
+                    {{
+                        $t("clientReportGenerated", {
+                            time: utcDate(report.generatedAt),
+                            revision: report.client.revision,
+                        })
+                    }}
+                </p>
+                <p class="small">{{ $t("clientReportMembership") }}</p>
+                <p v-if="report.monitors.length === 0" role="status">{{ $t("clientReportEmpty") }}</p>
+                <p>{{ $t("clientReportTotalsHelp", { count: report.monitors.length }) }}</p>
+                <PeriodSummary
+                    :summary="totals"
+                    :show-response="false"
+                    :show-range="false"
+                    total-label="clientReportMonitorTime"
+                />
+                <h2 class="h5 mt-4">{{ $t("clientReportPerMonitor") }}</h2>
+                <div class="table-responsive report-table">
+                    <table class="table table-sm">
+                        <caption class="visually-hidden">{{ $t("clientReportPerMonitor") }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">{{ $t("Name") }}</th>
+                                <th scope="col">{{ $t("clientReportAvailability") }}</th>
+                                <th scope="col">{{ $t("clientReportCoverage") }}</th>
+                                <th scope="col">{{ $t("periodSummaryState_down") }}</th>
+                                <th scope="col">{{ $t("periodSummaryNoData") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="monitor in report.monitors"
+                                :key="monitor.id"
+                                data-testid="client-report-monitor"
+                            >
+                                <th scope="row">
+                                    {{ monitor.name }}
+                                    <div class="fw-normal small">
+                                        {{
+                                            $t("clientReportMonitorCounts", {
+                                                total: monitor.summary.counts.total,
+                                                down: monitor.summary.counts.down,
+                                            })
+                                        }}
+                                    </div>
+                                </th>
+                                <td>{{ percent(monitor.summary.availability) }}</td>
+                                <td>{{ percent(monitor.summary.coverage) }}</td>
+                                <td>{{ duration(monitor.summary.time.down) }}</td>
+                                <td>{{ duration(monitor.summary.time.unknown) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h2 class="h5 mt-4">{{ $t("periodSummaryResponse") }}</h2>
+                <div class="table-responsive report-table">
+                    <table class="table table-sm">
+                        <caption class="visually-hidden">{{ $t("periodSummaryResponse") }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">{{ $t("Name") }}</th>
+                                <th scope="col">{{ $t("clientReportSamples") }}</th>
+                                <th v-for="metric in metrics" :key="metric" scope="col">
+                                    {{ $t("periodSummaryResponse_" + metric) }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="monitor in report.monitors" :key="monitor.id">
+                                <th scope="row">{{ monitor.name }}</th>
+                                <td>{{ monitor.summary.response.samples }}</td>
+                                <td v-for="metric in metrics" :key="metric">
+                                    {{ milliseconds(monitor.summary.response[metric]) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="small">{{ $t("clientReportResponseHelp") }}</p>
+            </article>
         </div>
-        <div v-if="!$root.loggedIn" class="no-print"><Login v-if="$root.allowLoginDialog" /></div>
-        <p v-if="loading" class="no-print" role="status">{{ $t("exportHistoryLoading") }}</p>
-        <p v-if="error" class="text-danger no-print" role="alert">{{ error }}</p>
-        <article v-if="report" data-testid="client-report">
-            <h1>{{ $t("clientReportTitle") }}: {{ report.client.name }}</h1>
-            <p class="report-range">{{ report.start }} — {{ report.end }}</p>
-            <p class="small">
-                {{ $t("clientReportGenerated", { time: report.generatedAt, revision: report.client.revision }) }}
-            </p>
-            <p class="small">{{ $t("clientReportMembership") }}</p>
-            <p v-if="report.monitors.length === 0" role="status">{{ $t("clientReportEmpty") }}</p>
-            <p>{{ $t("clientReportTotalsHelp", { count: report.monitors.length }) }}</p>
-            <PeriodSummary :summary="totals" :show-response="false" total-label="clientReportMonitorTime" />
-            <h2 class="h5 mt-4">{{ $t("clientReportPerMonitor") }}</h2>
-            <div class="table-responsive report-table">
-                <table class="table table-sm">
-                    <caption class="visually-hidden">{{ $t("clientReportPerMonitor") }}</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">{{ $t("Name") }}</th>
-                            <th scope="col">{{ $t("clientReportAvailability") }}</th>
-                            <th scope="col">{{ $t("clientReportCoverage") }}</th>
-                            <th scope="col">{{ $t("periodSummaryState_down") }}</th>
-                            <th scope="col">{{ $t("periodSummaryNoData") }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="monitor in report.monitors" :key="monitor.id" data-testid="client-report-monitor">
-                            <th scope="row">
-                                {{ monitor.name }}
-                                <div class="fw-normal small">
-                                    {{
-                                        $t("clientReportMonitorCounts", {
-                                            total: monitor.summary.counts.total,
-                                            down: monitor.summary.counts.down,
-                                        })
-                                    }}
-                                </div>
-                            </th>
-                            <td>{{ percent(monitor.summary.availability) }}</td>
-                            <td>{{ percent(monitor.summary.coverage) }}</td>
-                            <td>{{ duration(monitor.summary.time.down) }}</td>
-                            <td>{{ duration(monitor.summary.time.unknown) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <h2 class="h5 mt-4">{{ $t("periodSummaryResponse") }}</h2>
-            <div class="table-responsive report-table">
-                <table class="table table-sm">
-                    <caption class="visually-hidden">{{ $t("periodSummaryResponse") }}</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">{{ $t("Name") }}</th>
-                            <th scope="col">{{ $t("clientReportSamples") }}</th>
-                            <th v-for="metric in metrics" :key="metric" scope="col">
-                                {{ $t("periodSummaryResponse_" + metric) }}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="monitor in report.monitors" :key="monitor.id">
-                            <th scope="row">{{ monitor.name }}</th>
-                            <td>{{ monitor.summary.response.samples }}</td>
-                            <td v-for="metric in metrics" :key="metric">
-                                {{ milliseconds(monitor.summary.response[metric]) }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <p class="small">{{ $t("clientReportResponseHelp") }}</p>
-        </article>
-    </div>
+    </main>
 </template>
 
 <script>
@@ -210,6 +240,30 @@ export default {
     }
 }
 
+@media screen {
+    .client-report-page {
+        padding: clamp(14px, 4vw, 36px);
+    }
+
+    .client-report-page article {
+        padding: clamp(14px, 4vw, 36px);
+        border: 1px solid var(--ws-border);
+        border-radius: 16px;
+        background: var(--ws-surface);
+        box-shadow: var(--ws-shadow);
+    }
+
+    .client-report-page h1 {
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 720;
+    }
+
+    .client-report-page .report-range {
+        color: var(--ws-muted);
+        font-variant-numeric: tabular-nums;
+    }
+}
+
 @media print {
     @page {
         size: a4;
@@ -224,6 +278,16 @@ export default {
     body:has(.client-report-page) {
         background: white !important;
         color: black !important;
+    }
+
+    .client-report-shell.workspace-shell {
+        min-height: 0;
+        color-scheme: light;
+        background: white !important;
+        color: black !important;
+
+        --bs-body-color: #000;
+        --bs-emphasis-color: #000;
     }
 
     .client-report-page {

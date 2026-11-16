@@ -1,35 +1,62 @@
 <template>
-    <transition name="slide-fade" appear>
-        <MonitorList :scrollbar="true" />
-    </transition>
+    <Overview services-page>
+        <template #actions>
+            <button
+                class="ws-button ws-button-quiet"
+                type="button"
+                :aria-expanded="managementOpen"
+                aria-controls="workspace-management"
+                data-testid="service-management-open"
+                @click="openManagement"
+            >
+                <WorkspaceIcon name="monitors" />
+                {{ $t("workspaceManageChecks") }}
+            </button>
+        </template>
+        <template #management>
+            <details
+                id="workspace-management"
+                ref="management"
+                class="ws-management"
+                data-testid="service-management"
+                :open="managementOpen"
+                @toggle="managementOpen = $event.target.open"
+            >
+                <summary>{{ $t("workspaceManageChecks") }}</summary>
+                <p class="ws-channel-note">{{ $t("workspaceManagementHelp") }}</p>
+                <MonitorList v-if="managementOpen" :scrollbar="false" />
+            </details>
+        </template>
+    </Overview>
 </template>
 
 <script>
 import MonitorList from "../components/MonitorList.vue";
+import WorkspaceIcon from "../components/WorkspaceIcon.vue";
+import Overview from "./Overview.vue";
 
 export default {
     components: {
         MonitorList,
+        WorkspaceIcon,
+        Overview,
     },
-    watch: {
-        "$root.isMobile"(newVal) {
-            if (!newVal && this.$route.path === "/list") {
-                this.$router.replace({ path: "/dashboard" });
-            }
+    data() {
+        return { managementOpen: false };
+    },
+    methods: {
+        /** @returns {void} Reveal the preserved bulk, tag and ordering controls */
+        openManagement() {
+            this.managementOpen = true;
+            this.$nextTick(() => {
+                const panel = this.$refs.management;
+                panel?.scrollIntoView({
+                    block: "start",
+                    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+                });
+                panel?.querySelector("summary")?.focus({ preventScroll: true });
+            });
         },
-    },
-    mounted() {
-        if (!this.$root.isMobile && this.$route.path === "/list") {
-            this.$router.replace({ path: "/dashboard" });
-        }
     },
 };
 </script>
-
-<style lang="scss" scoped>
-@import "../assets/vars";
-
-.shadow-box {
-    padding: 20px;
-}
-</style>

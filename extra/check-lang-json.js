@@ -13,7 +13,7 @@ for (let jsonFile of jsonFileList) {
     }
 
     let jsonPath = path + "/" + jsonFile;
-    let originalContent = fs.readFileSync(jsonPath, "utf8");
+    let originalContent = fs.readFileSync(jsonPath, "utf8").replace(/\r\n/g, "\n");
     let langData = JSON.parse(originalContent);
 
     let formattedContent = JSON.stringify(langData, null, 4) + "\n";

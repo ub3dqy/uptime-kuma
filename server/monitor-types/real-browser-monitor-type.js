@@ -4,11 +4,14 @@ const { UP, log } = require("../../src/util");
 const { Settings } = require("../settings");
 const childProcess = require("child_process");
 const path = require("path");
+const fs = require("node:fs/promises");
+const os = require("node:os");
 const Database = require("../database");
 const jwt = require("jsonwebtoken");
 const config = require("../config");
 const { RemoteBrowser } = require("../remote-browser");
 const { commandExists } = require("../util-server");
+const { savedSteps, checkJourney } = require("./browser-journey");
 
 /**
  * Cached instance of a browser
@@ -71,6 +74,38 @@ async function isAllowedChromeExecutable(executablePath) {
 }
 
 /**
+ * @param {string|undefined} executablePath Local Chromium executable
+ * @returns {Promise<import("playwright-core").Browser>} Browser with writable configuration in containers
+ */
+async function launchLocalBrowser(executablePath) {
+    if (process.platform !== "linux" || !process.env.UPTIME_KUMA_IS_CONTAINER) {
+        return chromium.launch({ executablePath });
+    }
+
+    // Chromium starts Crashpad before opening a page and needs a writable configuration directory.
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "kuma-chromium-"));
+    const clean = async () => {
+        try {
+            await fs.rm(directory, { recursive: true, force: true });
+        } catch {
+            log.warn("chromium", "Could not remove temporary Chromium configuration");
+        }
+    };
+
+    try {
+        const instance = await chromium.launch({
+            executablePath,
+            env: { ...process.env, XDG_CONFIG_HOME: directory, XDG_CACHE_HOME: directory },
+        });
+        instance.once("disconnected", clean);
+        return instance;
+    } catch (error) {
+        await clean();
+        throw error;
+    }
+}
+
+/**
  * Get the current instance of the browser. If there isn't one, create
  * it.
  * @returns {Promise<import ("playwright-core").Browser>} The browser
@@ -83,10 +118,7 @@ async function getBrowser() {
 
         executablePath = await prepareChromeExecutable(executablePath);
 
-        browser = await chromium.launch({
-            //headless: false,
-            executablePath,
-        });
+        browser = await launchLocalBrowser(executablePath);
 
         return browser;
     }
@@ -101,8 +133,7 @@ async function getBrowser() {
 async function getRemoteBrowser(remoteBrowserID, userId) {
     let remoteBrowser = await RemoteBrowser.get(remoteBrowserID, userId);
     log.debug("chromium", `Using remote browser: ${remoteBrowser.name} (${remoteBrowser.id})`);
-    browser = await chromium.connect(remoteBrowser.url);
-    return browser;
+    return chromium.connect(remoteBrowser.url);
 }
 
 /**
@@ -218,9 +249,7 @@ async function testChrome(executablePath) {
 
         log.info("chromium", "Testing Chromium executable: " + executablePath);
 
-        const browser = await chromium.launch({
-            executablePath,
-        });
+        const browser = await launchLocalBrowser(executablePath);
         const version = browser.version();
         await browser.close();
         return version;
@@ -250,11 +279,25 @@ class RealBrowserMonitorType extends MonitorType {
      * @inheritdoc
      */
     async check(monitor, heartbeat, server) {
-        const browser = monitor.remote_browser
-            ? await getRemoteBrowser(monitor.remote_browser, monitor.user_id)
-            : await getBrowser();
-        const context = await browser.newContext();
+        if (savedSteps(monitor).length) {
+            const result = await checkJourney(await getBrowser(), monitor);
+            if (result.failedStep !== null) {
+                throw new Error(
+                    result.failedStep === 0
+                        ? "Browser route did not load"
+                        : "Browser step " + result.failedStep + " failed"
+                );
+            }
+            heartbeat.status = UP;
+            heartbeat.msg = "Browser journey completed";
+            heartbeat.ping = result.responseMS;
+            return;
+        }
+        const remote = Boolean(monitor.remote_browser);
+        const browser = remote ? await getRemoteBrowser(monitor.remote_browser, monitor.user_id) : await getBrowser();
+        let context;
         try {
+            context = await browser.newContext();
             const page = await context.newPage();
 
             // Prevent Local File Inclusion
@@ -291,7 +334,13 @@ class RealBrowserMonitorType extends MonitorType {
                 throw new Error(res.status() + "");
             }
         } finally {
-            await context.close();
+            try {
+                await context?.close();
+            } finally {
+                if (remote) {
+                    await browser.close();
+                }
+            }
         }
     }
 }

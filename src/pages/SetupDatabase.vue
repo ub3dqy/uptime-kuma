@@ -1,24 +1,32 @@
 <template>
-    <div v-if="show" class="form-container">
-        <form @submit.prevent="submit">
-            <div>
-                <object width="64" height="64" data="/icon.svg" />
-                <div style="font-size: 28px; font-weight: bold; margin-top: 5px">Uptime Kuma</div>
-            </div>
+    <main class="workspace-shell ws-access" :class="{ dark: $root.isDark }">
+        <form
+            v-if="show"
+            class="ws-access-panel ws-access-panel-wide"
+            aria-labelledby="database-setup-title"
+            @submit.prevent="submit"
+        >
+            <header class="ws-access-heading">
+                <span class="workspace-brand">
+                    <img width="32" height="32" src="/images/kuma-pulse.png" alt="" />
+                    Uptime Kuma
+                </span>
+                <h1 id="database-setup-title">{{ $t("setupDatabaseChooseDatabase") }}</h1>
+            </header>
 
-            <div v-if="info.runningSetup" class="mt-5">
-                <div class="alert alert-success mx-3 px-4" role="alert">
+            <div v-if="info.runningSetup">
+                <div class="alert alert-success mb-0" role="status">
                     <div class="d-flex align-items-center">
                         <strong>{{ $t("settingUpDatabaseMSG") }}</strong>
                         <div class="ms-3 pt-1">
-                            <div class="spinner-border" role="status" aria-hidden="true"></div>
+                            <div class="spinner-border" aria-hidden="true"></div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <template v-if="!info.runningSetup">
-                <div class="form-floating short mt-3">
+                <div class="form-floating">
                     <select id="language" v-model="$root.language" class="form-select">
                         <option v-for="(lang, i) in $i18n.availableLocales" :key="`Lang${i}`" :value="lang">
                             {{ $i18n.messages[lang].languageName }}
@@ -27,17 +35,14 @@
                     <label for="language" class="form-label">{{ $t("Language") }}</label>
                 </div>
 
-                <p class="mt-5 short">
-                    {{ $t("setupDatabaseChooseDatabase") }}
-                </p>
-
-                <div class="btn-group" role="group" :aria-label="$t('Basic radio toggle button group')">
+                <div class="db-choices mt-3" role="radiogroup" aria-labelledby="database-setup-title">
                     <template v-if="info.isEnabledEmbeddedMariaDB">
                         <input
                             id="btnradio3"
                             v-model="dbConfig.type"
                             type="radio"
                             class="btn-check"
+                            name="database-type"
                             autocomplete="off"
                             value="embedded-mariadb"
                         />
@@ -50,87 +55,107 @@
                         v-model="dbConfig.type"
                         type="radio"
                         class="btn-check"
+                        name="database-type"
                         autocomplete="off"
                         value="mariadb"
                     />
-                    <label class="btn btn-outline-primary" for="btnradio2">MariaDB/MySQL</label>
+                    <label class="btn btn-outline-primary" for="btnradio2">MariaDB / MySQL</label>
 
                     <input
                         id="btnradio1"
                         v-model="dbConfig.type"
                         type="radio"
                         class="btn-check"
+                        name="database-type"
                         autocomplete="off"
                         value="sqlite"
                     />
                     <label class="btn btn-outline-primary" for="btnradio1">SQLite</label>
                 </div>
 
-                <div v-if="dbConfig.type === 'embedded-mariadb'" class="mt-3 short">
+                <div v-if="dbConfig.type === 'embedded-mariadb'" class="mt-3">
                     {{ $t("setupDatabaseEmbeddedMariaDB") }}
                 </div>
 
-                <div v-if="dbConfig.type === 'mariadb'" class="mt-3 short">
+                <div v-if="dbConfig.type === 'mariadb'" class="mt-3">
                     {{ $t("setupDatabaseMariaDB") }}
                 </div>
 
-                <div v-if="dbConfig.type === 'sqlite'" class="mt-3 short">
+                <div v-if="dbConfig.type === 'sqlite'" class="mt-3">
                     {{ $t("setupDatabaseSQLite") }}
                 </div>
 
                 <template v-if="dbConfig.type === 'mariadb'">
-                    <div v-if="!isProvidedMariaDBSocket" class="form-floating mt-3 short">
+                    <div v-if="!isProvidedMariaDBSocket" class="form-floating mt-3">
                         <input
-                            id="floatingInput"
+                            id="database-hostname"
                             v-model="dbConfig.hostname"
                             type="text"
                             class="form-control"
+                            placeholder=" "
                             required
                         />
-                        <label for="floatingInput">{{ $t("Hostname") }}</label>
+                        <label for="database-hostname">{{ $t("Hostname") }}</label>
                     </div>
 
-                    <div v-if="!isProvidedMariaDBSocket" class="form-floating mt-3 short">
-                        <input id="floatingInput" v-model="dbConfig.port" type="text" class="form-control" required />
-                        <label for="floatingInput">{{ $t("Port") }}</label>
+                    <div v-if="!isProvidedMariaDBSocket" class="form-floating mt-3">
+                        <input
+                            id="database-port"
+                            v-model="dbConfig.port"
+                            type="text"
+                            inputmode="numeric"
+                            placeholder=" "
+                            class="form-control"
+                            required
+                        />
+                        <label for="database-port">{{ $t("Port") }}</label>
                     </div>
 
-                    <div v-if="isProvidedMariaDBSocket" class="mt-1 short text-start">
+                    <div v-if="isProvidedMariaDBSocket" class="mt-1 text-start">
                         <i18n-t keypath="mariadbSocketPathDetectedHelptext" tag="div" class="form-text">
                             <code>UPTIME_KUMA_DB_SOCKET</code>
                         </i18n-t>
                     </div>
 
-                    <hr v-if="isProvidedMariaDBSocket" class="mt-3 mb-2 short" />
+                    <hr v-if="isProvidedMariaDBSocket" class="mt-3 mb-2" />
 
-                    <div class="form-floating mt-3 short">
+                    <div class="form-floating mt-3">
                         <input
-                            id="floatingInput"
+                            id="database-username"
                             v-model="dbConfig.username"
                             type="text"
                             class="form-control"
+                            placeholder=" "
                             required
                         />
-                        <label for="floatingInput">{{ $t("Username") }}</label>
+                        <label for="database-username">{{ $t("Username") }}</label>
                     </div>
 
-                    <div class="form-floating mt-3 short">
+                    <div class="form-floating mt-3">
                         <input
-                            id="floatingInput"
+                            id="database-password"
                             v-model="dbConfig.password"
                             type="password"
                             class="form-control"
+                            placeholder=" "
                             required
                         />
-                        <label for="floatingInput">{{ $t("Password") }}</label>
+                        <label for="database-password">{{ $t("Password") }}</label>
                     </div>
 
-                    <div class="form-floating mt-3 short">
-                        <input id="floatingInput" v-model="dbConfig.dbName" type="text" class="form-control" required />
-                        <label for="floatingInput">{{ $t("dbName") }}</label>
+                    <div class="form-floating mt-3">
+                        <input
+                            id="database-name"
+                            v-model="dbConfig.dbName"
+                            type="text"
+                            placeholder=" "
+                            class="form-control"
+                            required
+                        />
+                        <label for="database-name">{{ $t("dbName") }}</label>
                     </div>
 
-                    <div class="mt-3 short text-start">
+                    <div class="mt-3 text-start">
                         <div class="form-check form-switch ps-0" style="height: auto; display: block; padding: 0">
                             <div class="d-flex align-items-center">
                                 <input
@@ -154,7 +179,7 @@
                         </div>
                     </div>
 
-                    <div v-if="dbConfig.ssl" class="form-floating mt-3 short">
+                    <div v-if="dbConfig.ssl" class="form-floating mt-3">
                         <textarea
                             id="caInput"
                             v-model="dbConfig.ca"
@@ -167,12 +192,16 @@
                     </div>
                 </template>
 
-                <button class="btn btn-primary mt-4 short" type="submit" :disabled="disabledButton">
+                <button
+                    class="w-100 ws-button ws-button-primary justify-content-center mt-4"
+                    type="submit"
+                    :disabled="disabledButton"
+                >
                     {{ $t("Next") }}
                 </button>
             </template>
         </form>
-    </div>
+    </main>
 </template>
 
 <script>
@@ -231,7 +260,7 @@ export default {
                 await sleep(2000);
                 await this.goToMainServerWhenReady();
             } catch (e) {
-                toast.error(e.response.data);
+                toast.error(e.response?.data || e.message);
             } finally {
                 this.info.runningSetup = false;
             }
@@ -256,70 +285,37 @@ export default {
                 await this.goToMainServerWhenReady();
             }
         },
-
-        test() {
-            this.$root.toastError("not implemented");
-        },
     },
 };
 </script>
 
 <style lang="scss" scoped>
-.form-container {
+.db-choices {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.db-choices label {
+    flex: 1 1 128px;
+    display: flex;
+    min-height: 48px;
     justify-content: center;
-    padding-top: 40px;
-    padding-bottom: 40px;
-}
-
-.btn-group {
-    label {
-        width: 200px;
-        line-height: 55px;
-        font-size: 16px;
-        font-weight: bold;
-    }
-}
-
-.form-floating {
-    > .form-select {
-        padding-left: 1.3rem;
-        padding-top: 1.525rem;
-        line-height: 1.35;
-
-        ~ label {
-            padding-left: 1.3rem;
-        }
-    }
-
-    > label {
-        padding-left: 1.3rem;
-    }
-
-    > .form-control {
-        padding-left: 1.3rem;
-    }
-}
-
-.form-check {
-    height: calc(3.5rem + 2px);
-    padding: 0;
-    display: flex;
     align-items: center;
-    justify-content: space-around;
+    border-color: var(--ws-control-border);
+    color: var(--ws-ink);
+    font-weight: 600;
+    overflow-wrap: normal;
 }
 
-.short {
-    width: 300px;
+.db-choices :checked + label {
+    border-color: var(--ws-action);
+    color: var(--ws-action);
+    background: var(--ws-action-soft);
 }
 
-form {
-    max-width: 800px;
-    text-align: center;
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-    align-items: center;
+.db-choices :focus-visible + label {
+    outline: 3px solid #347bc4;
+    outline-offset: 2px;
 }
 </style>

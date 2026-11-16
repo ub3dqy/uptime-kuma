@@ -1,6 +1,7 @@
 const { MonitorType } = require("./monitor-type");
 const { UP } = require("../../src/util");
 const tcpp = require("tcp-ping");
+const net = require("node:net");
 
 /**
  * Send TCP request to specified hostname and port
@@ -39,6 +40,24 @@ class TCPMonitorType extends MonitorType {
      */
     async check(monitor, heartbeat, _server) {
         try {
+            const policy = await require("../projects/network-policy").policyForOwner(monitor.user_id);
+            if (policy) {
+                const [address] = await policy.addresses(monitor.hostname);
+                const started = Date.now();
+                await new Promise((resolve, reject) => {
+                    const socket = net.createConnection({ host: address, port: monitor.port });
+                    socket.setTimeout(15000, () => socket.destroy(new Error("Connection timeout")));
+                    socket.once("connect", () => {
+                        socket.destroy();
+                        resolve();
+                    });
+                    socket.once("error", reject);
+                });
+                heartbeat.ping = Date.now() - started;
+                heartbeat.msg = `${heartbeat.ping} ms`;
+                heartbeat.status = UP;
+                return;
+            }
             const resp = await tcping(monitor.hostname, monitor.port);
             heartbeat.ping = resp;
             heartbeat.msg = `${resp} ms`;

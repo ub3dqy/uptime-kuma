@@ -1,6 +1,25 @@
 export default {
     methods: {
         /**
+         * @param {string} value Saved UTC timestamp
+         * @returns {string} Readable UTC date that remains unambiguous when printed
+         */
+        utcDate(value) {
+            const date = new Date(value);
+            return Number.isFinite(date.getTime())
+                ? this.$d(date, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      timeZone: "UTC",
+                      timeZoneName: "short",
+                  })
+                : this.$t("periodSummaryUnavailable");
+        },
+        /**
          * @param {number|null} value Ratio
          * @returns {string} Localized percentage without false complete coverage
          */

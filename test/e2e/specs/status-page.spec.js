@@ -6,8 +6,76 @@ test.describe("Status Page", () => {
         await restoreSqliteSnapshot(page);
     });
 
+    test("missing public status keeps the 404 response and gives visitors a usable way home", async ({ page }) => {
+        const response = await page.goto("./status/missing-frontend-audit");
+        expect(response.status()).toBe(404);
+        await expect(page.getByRole("heading", { name: "Page Not Found" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Go back to home page." })).toHaveAttribute("href", "/");
+        await expect(page).toHaveURL(/\/status\/missing-frontend-audit$/);
+    });
+
+    test("edits and saves a status page at phone width without clipping the form", async ({ page }) => {
+        await page.setViewportSize({ width: 360, height: 780 });
+        await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
+        await page.goto("./add-status-page");
+        await login(page);
+        await page.getByTestId("name-input").fill("Mobile status");
+        await page.getByTestId("slug-input").fill("mobile-status");
+        await page.getByTestId("submit-button").click();
+        const sidebar = page.getByTestId("edit-sidebar");
+        await expect(sidebar).toBeVisible();
+        const box = await sidebar.boundingBox();
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(360);
+        await page.getByTestId("description-input").fill("Saved from the phone layout");
+        await page.getByTestId("add-group-button").click();
+        await page.getByTestId("group-name").fill("Mobile group");
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/status/mobile-status");
+        await expect(page.getByText("Saved from the phone layout")).toBeVisible();
+        const group = page.getByRole("button", { name: "Mobile group" });
+        await group.focus();
+        await group.press("Enter");
+        await expect(group).toHaveAttribute("aria-expanded", "false");
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    });
+
+    test("the public page requests heartbeats once per refresh interval", async ({ page }) => {
+        await page.goto("./add-status-page");
+        await login(page);
+        await page.getByTestId("name-input").fill("Refresh audit");
+        await page.getByTestId("slug-input").fill("refresh-audit");
+        await page.getByTestId("submit-button").click();
+        const interval = page.getByTestId("refresh-interval-input");
+        await interval.fill("5");
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/status/refresh-audit");
+
+        await page.clock.install();
+        let polls = 0;
+        await page.route("**/api/status-page/heartbeat/refresh-audit", async (route) => {
+            polls++;
+            await route.continue();
+        });
+        await page.reload();
+        await expect.poll(() => polls).toBe(1);
+        const refreshed = page.waitForResponse("**/api/status-page/heartbeat/refresh-audit");
+        await page.clock.runFor(5000);
+        await refreshed;
+        await page.clock.runFor(100);
+        expect(polls).toBe(2);
+    });
+
     test("create and edit", async ({ page }, testInfo) => {
         test.setTimeout(60000); // Keep the timeout increase for stability
+        await page.route(/^https:\/\/(?:www\.googletagmanager\.com|[^/]+\.example\.com)\//, (route) =>
+            route.fulfill({ contentType: "application/javascript", body: "" })
+        );
+        const save = async () => {
+            const reloaded = page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame());
+            await page.getByTestId("save-button").click();
+            await reloaded;
+        };
 
         // Monitor
         const monitorName = "Monitor for Status Page";
@@ -84,7 +152,7 @@ test.describe("Status Page", () => {
         await page.getByTestId("show-certificate-expiry-checkbox").uncheck();
         await page.getByTestId("analytics-type-select").selectOption("google");
         await page.getByTestId("analytics-id-input").fill(googleAnalyticsId);
-        await page.getByTestId("custom-css-input").getByTestId("textarea").fill(customCss); // Prism
+        await page.getByTestId("custom-css-input").getByRole("textbox").fill(customCss);
 
         // Add an incident
         await page.getByTestId("create-incident-button").click();
@@ -113,7 +181,7 @@ test.describe("Status Page", () => {
 
         // Save the changes
         await screenshot(testInfo, page);
-        await page.getByTestId("save-button").click();
+        await save();
         await expect(page.getByTestId("edit-sidebar")).toHaveCount(0);
 
         // Ensure changes are visible
@@ -143,8 +211,7 @@ test.describe("Status Page", () => {
         );
         expect(await page.locator("head").innerHTML()).toContain(googleAnalyticsId);
 
-        const backgroundColor = await page.evaluate(() => window.getComputedStyle(document.body).backgroundColor);
-        expect(backgroundColor).toEqual("rgb(0, 128, 128)");
+        await expect(page.locator("body")).toHaveCSS("background-color", "rgb(0, 128, 128)");
 
         await screenshot(testInfo, page);
         expect(await page.locator("head").innerHTML()).toContain(googleAnalyticsId);
@@ -161,7 +228,7 @@ test.describe("Status Page", () => {
         await page.getByTestId("analytics-type-select").selectOption("umami");
         await page.getByTestId("analytics-script-url-input").fill(umamiAnalyticsScriptUrl);
         await page.getByTestId("analytics-id-input").fill(umamiAnalyticsWebsiteId);
-        await page.getByTestId("save-button").click();
+        await save();
 
         await expect(page.getByTestId("edit-sidebar")).toHaveCount(0);
         await expect(page.getByTestId("powered-by")).toContainText("Powered by");
@@ -172,15 +239,17 @@ test.describe("Status Page", () => {
 
         await screenshot(testInfo, page);
 
-        expect(await page.locator("head").innerHTML()).toContain(umamiAnalyticsScriptUrl);
-        expect(await page.locator("head").innerHTML()).toContain(umamiAnalyticsWebsiteId);
+        await expect(page.locator(`head script[src="${umamiAnalyticsScriptUrl}"]`)).toHaveAttribute(
+            "data-website-id",
+            umamiAnalyticsWebsiteId
+        );
 
         await page.getByTestId("edit-button").click();
         // Fill in plausible analytics after editing
         await page.getByTestId("analytics-type-select").selectOption("plausible");
         await page.getByTestId("analytics-script-url-input").fill(plausibleAnalyticsScriptUrl);
         await page.getByTestId("analytics-id-input").fill(plausibleAnalyticsDomainsUrls);
-        await page.getByTestId("save-button").click();
+        await save();
         await screenshot(testInfo, page);
         await page.waitForFunction(
             (scriptUrl) => {
@@ -197,7 +266,7 @@ test.describe("Status Page", () => {
         await page.getByTestId("analytics-type-select").selectOption("matomo");
         await page.getByTestId("analytics-script-url-input").fill(matomoUrl);
         await page.getByTestId("analytics-id-input").fill(matomoSiteId);
-        await page.getByTestId("save-button").click();
+        await save();
         await screenshot(testInfo, page);
         await page.waitForFunction(
             (url) => {
@@ -228,25 +297,28 @@ test.describe("Status Page", () => {
         await expect(page.getByTestId("monitor-type-select")).toBeVisible();
         await page.getByTestId("monitor-type-select").selectOption("http");
         await page.getByTestId("friendly-name-input").fill(maliciousMonitorName1);
-        await page.getByTestId("url-input").fill("https://malicious1.example.com");
+        await page.getByTestId("url-input").fill("http://127.0.0.1:1/");
         await page.getByTestId("save-button").click();
         await page.waitForURL("/dashboard/*");
+        await expect(page.getByTestId("monitor-status")).toHaveText("Down");
 
         // Create second monitor with title breakout payload
         await page.goto("./add");
         await page.getByTestId("monitor-type-select").selectOption("http");
         await page.getByTestId("friendly-name-input").fill(maliciousMonitorName2);
-        await page.getByTestId("url-input").fill("https://malicious2.example.com");
+        await page.getByTestId("url-input").fill("http://127.0.0.1:1/");
         await page.getByTestId("save-button").click();
         await page.waitForURL("/dashboard/*");
+        await expect(page.getByTestId("monitor-status")).toHaveText("Down");
 
         // Create third monitor with normal name
         await page.goto("./add");
         await page.getByTestId("monitor-type-select").selectOption("http");
         await page.getByTestId("friendly-name-input").fill(normalMonitorName);
-        await page.getByTestId("url-input").fill("https://normal.example.com");
+        await page.getByTestId("url-input").fill("http://127.0.0.1:1/");
         await page.getByTestId("save-button").click();
         await page.waitForURL("/dashboard/*");
+        await expect(page.getByTestId("monitor-status")).toHaveText("Down");
 
         // Create a status page
         await page.goto("./add-status-page");
@@ -268,6 +340,7 @@ test.describe("Status Page", () => {
         await page.getByTestId("monitor-select").getByRole("option", { name: normalMonitorName }).click();
 
         await page.getByTestId("save-button").click();
+        await page.waitForURL("/status/security-test");
         await expect(page.getByTestId("edit-sidebar")).toHaveCount(0);
 
         // Fetch the RSS feed

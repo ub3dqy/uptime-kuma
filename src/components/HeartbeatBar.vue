@@ -76,6 +76,7 @@ export default {
             hoverScale: 1.5,
             beatHoverAreaPadding: 4,
             move: false,
+            moveTimer: null,
             maxBeat: -1,
             // Tooltip data
             tooltipVisible: false,
@@ -187,7 +188,7 @@ export default {
                 let width = -(this.beatWidth + this.beatHoverAreaPadding * 2);
 
                 return {
-                    transition: "all ease-in-out 0.25s",
+                    transition: "transform ease-in-out 0.25s",
                     transform: `translateX(${width}px)`,
                 };
             }
@@ -283,23 +284,28 @@ export default {
          */
         canvasAriaLabel() {
             if (!this.shortBeatList || this.shortBeatList.length === 0) {
-                return "Heartbeat history: No data";
+                return this.$t("workspaceHeartbeatEmpty");
             }
 
             const validBeats = this.shortBeatList.filter((b) => b !== 0 && b !== null);
             const upCount = validBeats.filter((b) => Number(b.status) === UP).length;
             const downCount = validBeats.filter((b) => Number(b.status) === DOWN).length;
 
-            return `Heartbeat history: ${validBeats.length} checks, ${upCount} up, ${downCount} down`;
+            return this.$t("workspaceHeartbeatSummary", { total: validBeats.length, up: upCount, down: downCount });
         },
     },
     watch: {
         beatList: {
             handler() {
                 // Only handle the slide animation, drawCanvas is triggered by shortBeatList watcher
+                clearTimeout(this.moveTimer);
+                if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                    this.move = false;
+                    return;
+                }
                 this.move = true;
 
-                setTimeout(() => {
+                this.moveTimer = setTimeout(() => {
                     this.move = false;
                 }, 300);
             },
@@ -326,6 +332,7 @@ export default {
     },
     unmounted() {
         window.removeEventListener("resize", this.resize);
+        clearTimeout(this.moveTimer);
         // Clean up tooltip timeout
         if (this.tooltipTimeoutId) {
             clearTimeout(this.tooltipTimeoutId);

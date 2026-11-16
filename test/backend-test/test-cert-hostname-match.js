@@ -37,6 +37,16 @@ iPenGDCg1awOyRnvxNq1MtMDkR9AHwksukzwiYNexYjyvE2t0UzXhFXwazQ3
 `;
 
 describe("Certificate Hostname Validation", () => {
+    test("IP identities use the IP subject alternative name and malformed evidence never passes", () => {
+        const cert = require("node:fs").readFileSync(require("node:path").join(__dirname, "fixtures/identity-ip.pem"));
+        assert.equal(checkCertificateHostname(cert, "127.0.0.1"), true);
+        assert.equal(checkCertificateHostname(cert, "127.0.0.2"), false);
+        assert.equal(checkCertificateHostname(cert, "localhost"), true);
+        assert.equal(checkCertificateHostname(cert, "attacker.test"), false);
+        assert.equal(checkCertificateHostname(null, "localhost"), false);
+        assert.equal(checkCertificateHostname(cert, ""), false);
+        assert.equal(checkCertificateHostname("not a certificate", "localhost"), false);
+    });
     test("checkCertificateHostname() returns true when certificate matches hostname", () => {
         const result = checkCertificateHostname(testCert, "www.eff.org");
         assert.strictEqual(result, true);

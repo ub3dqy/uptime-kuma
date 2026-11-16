@@ -17,6 +17,14 @@ class SMTP extends NotificationProvider {
             secure: notification.smtpSecure,
             headers: {},
         };
+        if (notification.managedDelivery) {
+            Object.assign(config, {
+                connectionTimeout: 10000,
+                greetingTimeout: 10000,
+                socketTimeout: 15000,
+                requireTLS: true,
+            });
+        }
 
         // Handle TLS/STARTTLS options
         if (!notification.smtpSecure && notification.smtpIgnoreSTARTTLS) {
@@ -32,6 +40,7 @@ class SMTP extends NotificationProvider {
             // or STARTTLS (default behavior for ports 25, 587)
             config.tls = {
                 rejectUnauthorized: !notification.smtpIgnoreTLSError || false,
+                ...(notification.smtpServerName ? { servername: notification.smtpServerName } : {}),
             };
         }
 

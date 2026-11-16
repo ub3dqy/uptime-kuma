@@ -364,6 +364,8 @@ class StatusPage extends BeanModel {
      * @returns {Promise<Bean[]>} Status page list
      */
     static async sendStatusPageList(io, socket) {
+        const userID = socket.userID;
+        const generation = socket.projectGeneration;
         let result = {};
 
         let list = await R.findAll("status_page", " ORDER BY title ");
@@ -372,7 +374,10 @@ class StatusPage extends BeanModel {
             result[item.id] = await item.toJSON();
         }
 
-        io.to(socket.userID).emit("statusPageList", result);
+        if (socket.userID !== userID || socket.projectGeneration !== generation || socket.disconnected) {
+            return [];
+        }
+        io.to(userID).emit("statusPageList", result);
         return list;
     }
 

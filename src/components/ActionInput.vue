@@ -6,6 +6,7 @@
             class="form-control"
             :type="type"
             :placeholder="placeholder"
+            :aria-label="inputAriaLabel"
             :disabled="!enabled"
         />
         <button type="button" class="btn btn-outline-primary" :aria-label="actionAriaLabel" @click="action()">
@@ -71,6 +72,10 @@ export default {
          * The aria-label of the action button
          */
         actionAriaLabel: {
+            type: String,
+            required: true,
+        },
+        inputAriaLabel: {
             type: String,
             required: true,
         },

@@ -1,16 +1,14 @@
 <template>
-    <div class="form-container" data-cy="setup-form">
-        <div class="form">
-            <form @submit.prevent="submit">
-                <div>
-                    <object width="64" height="64" data="/icon.svg" />
-                    <div style="font-size: 28px; font-weight: bold; margin-top: 5px">Uptime Kuma</div>
-                </div>
-
-                <p class="mt-3">
-                    {{ $t("Create your admin account") }}
-                </p>
-
+    <main class="workspace-shell ws-access" :class="{ dark: $root.isDark }" data-cy="setup-form">
+        <div class="ws-access-panel">
+            <header class="ws-access-heading">
+                <span class="workspace-brand">
+                    <img width="32" height="32" src="/images/kuma-pulse.png" alt="" />
+                    Uptime Kuma
+                </span>
+                <h1 id="account-setup-title">{{ $t("Create your admin account") }}</h1>
+            </header>
+            <form aria-labelledby="account-setup-title" :aria-busy="processing" @submit.prevent="submit">
                 <div class="form-floating">
                     <select id="language" v-model="$root.language" class="form-select">
                         <option v-for="(lang, i) in $i18n.availableLocales" :key="`Lang${i}`" :value="lang">
@@ -22,28 +20,32 @@
 
                 <div class="form-floating mt-3">
                     <input
-                        id="floatingInput"
+                        id="setup-username"
                         v-model="username"
                         type="text"
+                        name="username"
+                        autocomplete="username"
                         class="form-control"
                         :placeholder="$t('Username')"
                         required
                         data-cy="username-input"
                     />
-                    <label for="floatingInput">{{ $t("Username") }}</label>
+                    <label for="setup-username">{{ $t("Username") }}</label>
                 </div>
 
                 <div class="form-floating mt-3">
                     <input
-                        id="floatingPassword"
+                        id="setup-password"
                         v-model="password"
                         type="password"
+                        name="password"
+                        autocomplete="new-password"
                         class="form-control"
                         :placeholder="$t('Password')"
                         required
                         data-cy="password-input"
                     />
-                    <label for="floatingPassword">{{ $t("Password") }}</label>
+                    <label for="setup-password">{{ $t("Password") }}</label>
                 </div>
 
                 <div class="form-floating mt-3">
@@ -51,6 +53,8 @@
                         id="repeat"
                         v-model="repeatPassword"
                         type="password"
+                        name="repeat-password"
+                        autocomplete="new-password"
                         class="form-control"
                         :placeholder="$t('Repeat Password')"
                         required
@@ -60,7 +64,7 @@
                 </div>
 
                 <button
-                    class="w-100 btn btn-primary mt-3"
+                    class="w-100 ws-button ws-button-primary justify-content-center mt-3"
                     type="submit"
                     :disabled="processing"
                     data-cy="submit-setup-form"
@@ -69,7 +73,7 @@
                 </button>
             </form>
         </div>
-    </div>
+    </main>
 </template>
 
 <script>
@@ -123,40 +127,3 @@ export default {
     },
 };
 </script>
-
-<style lang="scss" scoped>
-.form-container {
-    display: flex;
-    align-items: center;
-    padding-top: 40px;
-    padding-bottom: 40px;
-}
-
-.form-floating {
-    > .form-select {
-        padding-left: 1.3rem;
-        padding-top: 1.525rem;
-        line-height: 1.35;
-
-        ~ label {
-            padding-left: 1.3rem;
-        }
-    }
-
-    > label {
-        padding-left: 1.3rem;
-    }
-
-    > .form-control {
-        padding-left: 1.3rem;
-    }
-}
-
-.form {
-    width: 100%;
-    max-width: 330px;
-    padding: 15px;
-    margin: auto;
-    text-align: center;
-}
-</style>

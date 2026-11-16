@@ -1,7 +1,13 @@
 <template>
-    <div v-if="loadedTheme" class="container mt-3">
+    <NotFound v-if="notFound" />
+    <div
+        v-else-if="loadedTheme"
+        class="workspace-shell status-workspace"
+        :class="{ dark: $root.isDark, 'is-editing': enableEditMode }"
+    >
         <!-- Sidebar for edit mode -->
-        <div v-if="enableEditMode" class="sidebar" data-testid="edit-sidebar">
+        <aside v-if="enableEditMode" class="sidebar" data-testid="edit-sidebar" :aria-label="$t('Edit Status Page')">
+            <h2 class="sidebar-title">{{ $t("Edit Status Page") }}</h2>
             <div class="sidebar-body">
                 <div class="my-3">
                     <label for="slug" class="form-label">{{ $t("Slug") }}</label>
@@ -224,67 +230,93 @@
 
             <!-- Sidebar Footer -->
             <div class="sidebar-footer">
-                <button class="btn btn-success me-2" :disabled="loading" data-testid="save-button" @click="save">
+                <button
+                    type="button"
+                    class="ws-button ws-button-primary"
+                    :disabled="loading || !editMode"
+                    data-testid="save-button"
+                    @click="save"
+                >
                     <font-awesome-icon icon="save" />
                     {{ $t("Save") }}
                 </button>
 
-                <button class="btn btn-danger me-2" @click="discard">
+                <button type="button" class="ws-button ws-button-quiet" @click="discard">
                     <font-awesome-icon icon="undo" />
                     {{ $t("Discard") }}
                 </button>
             </div>
-        </div>
+        </aside>
 
         <!-- Main Status Page -->
-        <div :class="{ edit: enableEditMode }" class="main">
+        <main class="main">
             <!-- Logo & Title -->
             <h1 class="mb-4 title-flex">
                 <!-- Logo -->
-                <span class="logo-wrapper" @click="showImageCropUploadMethod">
+                <span class="logo-wrapper">
                     <button
                         v-if="editMode"
                         type="button"
-                        class="p-0 bg-transparent border-0 small-reset-btn reset-top-left"
-                        @click.stop="resetToDefaultImage"
+                        class="logo-control"
+                        :aria-label="$t('workspaceUploadLogo')"
+                        @click="showImageCropUploadMethod"
                     >
-                        <font-awesome-icon icon="times" class="text-danger" />
+                        <img :src="logoURL" alt="" width="56" height="56" class="logo" />
+                        <font-awesome-icon icon="upload" class="icon-upload" aria-hidden="true" />
                     </button>
-                    <img :src="logoURL" alt class="logo me-2" :class="logoClass" />
-                    <font-awesome-icon v-if="enableEditMode" class="icon-upload" icon="upload" />
+                    <img v-else :src="logoURL" alt="" width="56" height="56" class="logo" />
                 </span>
 
-                <!-- Uploader -->
-                <!--    url="/api/status-page/upload-logo" -->
-                <ImageCropUpload
-                    v-model="showImageCropUpload"
-                    field="img"
-                    :width="128"
-                    :height="128"
-                    :langType="$i18n.locale"
-                    img-format="png"
-                    :noCircle="true"
-                    :noSquare="false"
-                    @crop-success="cropSuccess"
+                <Editable
+                    v-model="config.title"
+                    tag="span"
+                    :contenteditable="editMode"
+                    :noNL="true"
+                    :aria-label="editMode ? $t('Title') : undefined"
                 />
-
-                <!-- Title -->
-                <Editable v-model="config.title" tag="span" :contenteditable="editMode" :noNL="true" />
             </h1>
+            <div v-if="editMode" class="mb-3">
+                <button type="button" class="ws-button ws-button-quiet" @click="resetToDefaultImage">
+                    {{ $t("workspaceResetLogo") }}
+                </button>
+            </div>
+
+            <!-- Uploader -->
+            <ImageCropUpload
+                v-if="editMode && showImageCropUpload"
+                v-model="showImageCropUpload"
+                field="img"
+                :width="128"
+                :height="128"
+                :langType="$i18n.locale"
+                img-format="png"
+                :noCircle="true"
+                :noSquare="false"
+                @crop-success="cropSuccess"
+            />
 
             <!-- Admin functions -->
-            <div v-if="hasToken" class="mb-2">
-                <div v-if="!enableEditMode">
-                    <button class="btn btn-primary mb-2 me-2" data-testid="edit-button" @click="edit">
+            <div v-if="hasToken && !loading" class="mb-2">
+                <div v-if="!enableEditMode" class="ws-access-actions mb-3">
+                    <button
+                        type="button"
+                        class="ws-button ws-button-primary"
+                        :disabled="clickedEditButton"
+                        data-testid="edit-button"
+                        @click="edit"
+                    >
                         <font-awesome-icon icon="edit" />
                         {{ $t("Edit Status Page") }}
                     </button>
 
-                    <a href="/manage-status-page" class="btn btn-primary mb-2">
+                    <a href="/manage-status-page" class="ws-button ws-button-quiet">
                         <font-awesome-icon icon="tachometer-alt" />
                         {{ $t("Go to Dashboard") }}
                     </a>
                 </div>
+                <p v-if="clickedEditButton && !enableEditMode" class="form-text" role="status">
+                    {{ $t("workspaceStatusOpeningEditor") }}
+                </p>
 
                 <div v-else>
                     <button
@@ -377,35 +409,45 @@
             </template>
 
             <!-- Overall Status -->
-            <div class="shadow-box list p-4 overall-status mb-4">
+            <div
+                class="shadow-box overall-status mb-4"
+                :class="{
+                    'is-up': allUp,
+                    'is-degraded': partialDown,
+                    'is-down': allDown,
+                    'is-maintenance': isMaintenance,
+                }"
+                role="status"
+            >
                 <div v-if="Object.keys($root.publicMonitorList).length === 0 && loadedData">
-                    <font-awesome-icon icon="question-circle" class="ok" />
+                    <font-awesome-icon icon="question-circle" aria-hidden="true" />
                     {{ $t("No Services") }}
                 </div>
 
                 <template v-else>
                     <div v-if="allUp">
-                        <font-awesome-icon icon="check-circle" class="ok" />
+                        <font-awesome-icon icon="check-circle" aria-hidden="true" />
                         {{ $t("All Systems Operational") }}
                     </div>
 
                     <div v-else-if="partialDown">
-                        <font-awesome-icon icon="exclamation-circle" class="warning" />
+                        <font-awesome-icon icon="exclamation-circle" aria-hidden="true" />
                         {{ $t("Partially Degraded Service") }}
                     </div>
 
                     <div v-else-if="allDown">
-                        <font-awesome-icon icon="times-circle" class="danger" />
+                        <font-awesome-icon icon="times-circle" aria-hidden="true" />
                         {{ $t("Degraded Service") }}
                     </div>
 
                     <div v-else-if="isMaintenance">
-                        <font-awesome-icon icon="wrench" class="status-maintenance" />
+                        <font-awesome-icon icon="wrench" aria-hidden="true" />
                         {{ $t("maintenanceStatus-under-maintenance") }}
                     </div>
 
                     <div v-else>
-                        <font-awesome-icon icon="question-circle" style="color: #efefef" />
+                        <font-awesome-icon icon="question-circle" aria-hidden="true" />
+                        {{ $t("workspaceStateUnknown") }}
                     </div>
                 </template>
             </div>
@@ -576,14 +618,14 @@
                     </a>
                 </p>
 
-                <div class="refresh-info mb-2">
+                <div v-if="lastUpdateTime" class="refresh-info mb-2">
                     <div>{{ $t("lastUpdatedAt", { date: lastUpdateTimeDisplay }) }}</div>
-                    <div data-testid="update-countdown-text">
+                    <div v-if="updateCountdownText" data-testid="update-countdown-text">
                         {{ $t("statusPageRefreshIn", [updateCountdownText]) }}
                     </div>
                 </div>
             </footer>
-        </div>
+        </main>
 
         <Confirm
             ref="confirmDelete"
@@ -599,6 +641,16 @@
             {{ config.customCSS }}
         </component>
     </div>
+    <main v-else class="workspace-shell ws-access" :class="{ dark: $root.isDark }">
+        <div class="ws-access-panel">
+            <h1 class="h4">{{ $t("Status Page") }}</h1>
+            <template v-if="loadFailed">
+                <p role="alert">{{ $t("workspaceStatusLoadFailed") }}</p>
+                <button type="button" class="ws-button ws-button-primary" @click="reloadPage">{{ $t("Retry") }}</button>
+            </template>
+            <p v-else class="mb-0" role="status">{{ $t("Loading...") }}</p>
+        </div>
+    </main>
 </template>
 
 <script>
@@ -608,6 +660,7 @@ import duration from "dayjs/plugin/duration";
 import Favico from "favico.js";
 import ImageCropUpload from "vue-image-crop-upload";
 import CodeEditor from "../components/CodeEditor.vue";
+import NotFound from "./NotFound.vue";
 import { useToast } from "../notifications";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -634,15 +687,13 @@ dayjs.extend(duration);
 
 const leavePageMsg = "Do you really want to leave? you have unsaved changes!";
 
-// eslint-disable-next-line no-unused-vars
-let feedInterval;
-
 const favicon = new Favico({
     animation: "none",
 });
 
 export default {
     components: {
+        NotFound,
         PublicGroupList,
         ImageCropUpload,
         Confirm,
@@ -657,15 +708,7 @@ export default {
 
     // Leave Page for vue route change
     beforeRouteLeave(to, from, next) {
-        if (this.editMode) {
-            const answer = window.confirm(leavePageMsg);
-            if (answer) {
-                next();
-            } else {
-                next(false);
-            }
-        }
-        next();
+        next(!this.editMode || window.confirm(leavePageMsg));
     },
 
     props: {
@@ -692,6 +735,8 @@ export default {
             showImageCropUpload: false,
             imgDataUrl: "/icon.svg",
             loadedTheme: false,
+            notFound: false,
+            loadFailed: false,
             loadedData: false,
             baseURL: "",
             clickedEditButton: false,
@@ -699,7 +744,10 @@ export default {
             privateConfigLoaded: false,
             privateConfigLoading: false,
             maintenanceList: [],
-            lastUpdateTime: dayjs(),
+            lastUpdateTime: null,
+            feedInterval: null,
+            disposed: false,
+            heartbeatsLoading: false,
             updateCountdown: null,
             updateCountdownText: null,
             loading: true,
@@ -711,7 +759,7 @@ export default {
     },
     computed: {
         logoURL() {
-            if (this.imgDataUrl.startsWith("data:")) {
+            if (this.imgDataUrl === "/icon.svg" || this.imgDataUrl.startsWith("data:")) {
                 return this.imgDataUrl;
             } else {
                 return this.baseURL + this.imgDataUrl;
@@ -769,19 +817,6 @@ export default {
 
         isPublished() {
             return this.config.published;
-        },
-
-        logoClass() {
-            if (this.editMode) {
-                return {
-                    "edit-mode": true,
-                };
-            }
-            return {};
-        },
-
-        incidentClass() {
-            return "bg-" + this.incident.style;
         },
 
         maintenanceClass() {
@@ -904,6 +939,12 @@ export default {
                 this.loadPrivateConfig();
             }
         },
+        "$root.allowLoginDialog"(allowed) {
+            if (allowed && !this.$root.loggedIn && this.clickedEditButton) {
+                this.clickedEditButton = false;
+                this.$root.toastError("workspaceStatusSignInAgain");
+            }
+        },
 
         /**
          * Selected a monitor and add to the list.
@@ -953,14 +994,7 @@ export default {
 
         // Browser change page
         // https://stackoverflow.com/questions/7317273/warn-user-before-leaving-web-page-with-unsaved-changes
-        window.addEventListener("beforeunload", (e) => {
-            if (this.editMode) {
-                (e || window.event).returnValue = leavePageMsg;
-                return leavePageMsg;
-            } else {
-                return null;
-            }
-        });
+        window.addEventListener("beforeunload", this.warnBeforeUnload);
 
         // Special handle for dev
         this.baseURL = getResBaseURL();
@@ -974,6 +1008,9 @@ export default {
 
         this.getData()
             .then((res) => {
+                if (this.disposed) {
+                    return;
+                }
                 if (!this.privateConfigLoaded) {
                     this.config = res.data.config;
                 }
@@ -991,36 +1028,16 @@ export default {
 
                 this.loading = false;
 
-                feedInterval = setInterval(
-                    () => {
-                        this.updateHeartbeatList();
-                    },
-                    Math.max(5, this.config.autoRefreshInterval) * 1000
-                );
-
-                this.incident = res.data.incident;
-                this.maintenanceList = res.data.maintenanceList;
-                this.$root.publicGroupList = res.data.publicGroupList;
-
-                this.loading = false;
-
-                // Configure auto-refresh loop
-                feedInterval = setInterval(
-                    () => {
-                        this.updateHeartbeatList();
-                    },
-                    Math.max(5, this.config.autoRefreshInterval) * 1000
-                );
+                this.feedInterval = setInterval(this.updateHeartbeatList, this.refreshSeconds() * 1000);
 
                 this.updateUpdateTimer();
                 this.publicConfigLoaded = true;
                 this.finishEditLoading();
             })
-            .catch(function (error) {
-                if (error.response.status === 404) {
-                    location.href = "/page-not-found";
-                }
-                console.log(error);
+            .catch((error) => {
+                if (this.disposed) return;
+                this.notFound = error.response?.status === 404;
+                this.loadFailed = !this.notFound;
             });
 
         this.updateHeartbeatList();
@@ -1032,29 +1049,65 @@ export default {
             this.edit();
         }
     },
+    beforeUnmount() {
+        this.disposed = true;
+        clearInterval(this.feedInterval);
+        clearInterval(this.updateCountdown);
+        window.removeEventListener("beforeunload", this.warnBeforeUnload);
+    },
     methods: {
+        /** @returns {void} Retry loading the public status page */
+        reloadPage() {
+            location.reload();
+        },
+        /**
+         * @param {BeforeUnloadEvent} event Browser navigation.
+         * @returns {void} Request confirmation when leaving the editor.
+         */
+        warnBeforeUnload(event) {
+            if (this.editMode) {
+                event.preventDefault();
+                event.returnValue = leavePageMsg;
+            }
+        },
+
+        /** @returns {number} Polling interval in seconds. */
+        refreshSeconds() {
+            const seconds = Number(this.config.autoRefreshInterval);
+            return Number.isFinite(seconds) && seconds > 0 ? Math.max(5, seconds) : 300;
+        },
         /**
          * Load authoritative editor settings once per page, without overwriting unsaved changes.
          * @returns {void}
          */
         loadPrivateConfig() {
-            if (!this.$root.loggedIn || this.privateConfigLoaded || this.privateConfigLoading) {
+            if (
+                !this.clickedEditButton ||
+                !this.$root.loggedIn ||
+                this.privateConfigLoaded ||
+                this.privateConfigLoading
+            ) {
                 return;
             }
             this.privateConfigLoading = true;
-            this.$root.getSocket().emit("getStatusPage", this.slug, (res) => {
-                this.privateConfigLoading = false;
-                if (res.ok) {
-                    this.config = res.config;
-                    if (!this.config.customCSS) {
-                        this.config.customCSS = "body {\n  \n}\n";
+            this.$root
+                .getSocket()
+                .timeout(12000)
+                .emit("getStatusPage", this.slug, (error, res) => {
+                    if (this.disposed) return;
+                    this.privateConfigLoading = false;
+                    if (!error && res?.ok && this.$root.loggedIn) {
+                        this.config = res.config;
+                        if (!this.config.customCSS) {
+                            this.config.customCSS = "body {\n  \n}\n";
+                        }
+                        this.privateConfigLoaded = true;
+                        this.finishEditLoading();
+                    } else {
+                        this.clickedEditButton = false;
+                        this.$root.toastError("workspaceStatusEditorFailed");
                     }
-                    this.privateConfigLoaded = true;
-                    this.finishEditLoading();
-                } else {
-                    this.$root.toastError(res.msg);
-                }
-            });
+                });
         },
 
         /**
@@ -1087,12 +1140,17 @@ export default {
 
         /**
          * Update the heartbeat list and update favicon if necessary
-         * @returns {void}
+         * @returns {Promise<void>}
          */
-        updateHeartbeatList() {
+        async updateHeartbeatList() {
             // If editMode, it will use the data from websocket.
-            if (!this.editMode) {
-                axios.get("/api/status-page/heartbeat/" + this.slug).then((res) => {
+            if (!this.editMode && !this.disposed && !this.heartbeatsLoading) {
+                this.heartbeatsLoading = true;
+                try {
+                    const res = await axios.get("/api/status-page/heartbeat/" + this.slug, { timeout: 15000 });
+                    if (this.disposed || this.editMode) {
+                        return;
+                    }
                     const { heartbeatList, uptimeList } = res.data;
 
                     this.$root.heartbeatList = heartbeatList;
@@ -1115,7 +1173,13 @@ export default {
                     this.loadedData = true;
                     this.lastUpdateTime = dayjs();
                     this.updateUpdateTimer();
-                });
+                } catch (error) {
+                    if (!this.disposed) {
+                        console.error("Could not refresh status page", error.message);
+                    }
+                } finally {
+                    this.heartbeatsLoading = false;
+                }
             }
         },
 
@@ -1125,23 +1189,16 @@ export default {
          */
         updateUpdateTimer() {
             clearInterval(this.updateCountdown);
+            if (!this.lastUpdateTime) return;
 
-            this.updateCountdown = setInterval(() => {
-                // rounding here as otherwise we sometimes skip numbers in cases of time drift
-                const countdown = dayjs.duration(
-                    Math.round(
-                        this.lastUpdateTime.add(Math.max(5, this.config.autoRefreshInterval), "seconds").diff(dayjs()) /
-                            1000
-                    ),
-                    "seconds"
-                );
-
-                if (countdown.as("seconds") < 0) {
-                    clearInterval(this.updateCountdown);
-                } else {
-                    this.updateCountdownText = countdown.format("mm:ss");
-                }
-            }, 1000);
+            const refreshAt = this.lastUpdateTime.add(this.refreshSeconds(), "seconds");
+            const tick = () => {
+                const remaining = Math.max(0, Math.ceil(refreshAt.diff(dayjs()) / 1000));
+                this.updateCountdownText = dayjs.duration(remaining, "seconds").format("mm:ss");
+                if (!remaining) clearInterval(this.updateCountdown);
+            };
+            this.updateCountdown = setInterval(tick, 1000);
+            tick();
         },
 
         /**
@@ -1150,6 +1207,10 @@ export default {
          */
         edit() {
             if (this.hasToken) {
+                if (this.$root.allowLoginDialog && !this.$root.loggedIn) {
+                    this.$root.toastError("workspaceStatusSignInAgain");
+                    return;
+                }
                 this.clickedEditButton = true;
                 this.$root.initSocketIO(true);
                 this.loadPrivateConfig();
@@ -1162,8 +1223,8 @@ export default {
          * @returns {void}
          */
         save() {
+            if (this.loading || !this.editMode) return;
             this.loading = true;
-            let startTime = new Date();
             this.config.slug = this.config.slug.trim().toLowerCase();
 
             this.$root
@@ -1172,19 +1233,7 @@ export default {
                     if (res.ok) {
                         this.enableEditMode = false;
                         this.$root.publicGroupList = res.publicGroupList;
-
-                        // Add some delay, so that the side menu animation would be better
-                        let endTime = new Date();
-                        let time = 100 - (endTime - startTime) / 1000;
-
-                        if (time < 0) {
-                            time = 0;
-                        }
-
-                        setTimeout(() => {
-                            this.loading = false;
-                            location.href = "/status/" + this.config.slug;
-                        }, time);
+                        location.replace("/status/" + this.config.slug);
                     } else {
                         this.loading = false;
                         toast.error(res.msg);
@@ -1511,74 +1560,123 @@ export default {
 <style lang="scss" scoped>
 @import "../assets/vars.scss";
 
-.overall-status {
-    font-weight: bold;
-    font-size: 25px;
-
-    .ok {
-        color: $primary;
-    }
-
-    .warning {
-        color: $warning;
-    }
-
-    .danger {
-        color: $danger;
-    }
-}
-
-h1 {
-    font-size: 30px;
-
-    img {
-        vertical-align: middle;
-        height: 60px;
-        width: 60px;
-    }
+.status-workspace {
+    display: grid;
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: clamp(16px, 4vw, 44px);
 }
 
 .main {
-    transition: all ease-in-out 0.1s;
+    width: min(100%, 990px);
+    min-width: 0;
+    margin-inline: auto;
+    overflow-wrap: anywhere;
+}
 
-    &.edit {
-        margin-left: 300px;
+.title-flex {
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 2vw, 18px);
+    min-height: 56px;
+    color: var(--ws-ink);
+    font-size: clamp(24px, 4vw, 38px);
+    font-weight: 730;
+    letter-spacing: -0.025em;
+}
+
+.overall-status {
+    --status-tone: var(--ws-muted);
+
+    padding: clamp(16px, 3vw, 26px);
+    border: 1px solid var(--ws-border);
+    border-inline-start: 4px solid var(--status-tone);
+    font-size: clamp(18px, 3vw, 24px);
+    font-weight: 680;
+
+    > div {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    svg {
+        flex: 0 0 auto;
+        color: var(--status-tone);
+    }
+
+    &.is-up {
+        --status-tone: var(--ws-action);
+    }
+
+    &.is-degraded {
+        --status-tone: var(--ws-warning);
+    }
+
+    &.is-down {
+        --status-tone: var(--ws-danger);
+    }
+
+    &.is-maintenance {
+        --status-tone: var(--trace-maintenance);
     }
 }
 
 .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 300px;
-    height: 100vh;
+    min-width: 0;
+    border: 1px solid var(--ws-border);
+    border-radius: 14px;
+    background: var(--ws-surface);
+    box-shadow: var(--ws-shadow);
+}
 
-    border-right: 1px solid #ededed;
+.sidebar-title {
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--ws-border);
+    font-size: 18px;
+    font-weight: 700;
+}
 
-    .danger-zone {
-        border-top: 1px solid #ededed;
-        padding-top: 15px;
+.sidebar-body {
+    min-height: 0;
+    padding-inline: 16px;
+}
+
+.sidebar-footer {
+    position: sticky;
+    z-index: 2;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--ws-border);
+    border-radius: 0 0 14px 14px;
+    background: var(--ws-surface);
+}
+
+.danger-zone {
+    padding-block: 14px;
+    border-top: 1px solid var(--ws-border);
+}
+
+@media (min-width: 960px) {
+    .status-workspace.is-editing {
+        grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+    }
+
+    .sidebar {
+        position: sticky;
+        top: 16px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        max-height: calc(100dvh - 32px);
     }
 
     .sidebar-body {
-        padding: 0 10px 10px 10px;
-        overflow-x: hidden;
-        overflow-y: auto;
-        height: calc(100% - 70px);
-    }
-
-    .sidebar-footer {
-        border-top: 1px solid #ededed;
-        border-right: 1px solid #ededed;
-        padding: 10px;
-        width: 300px;
-        height: 70px;
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        background-color: white;
-        display: flex;
-        align-items: center;
+        overflow: auto;
     }
 }
 
@@ -1587,105 +1685,33 @@ footer {
     font-size: 14px;
 }
 
-.description span {
-    min-width: 50px;
-}
-
-.title-flex {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
 .logo-wrapper {
-    display: inline-block;
-    position: relative;
-
-    &:hover {
-        .icon-upload {
-            transform: scale(1.2);
-        }
-    }
-
-    .icon-upload {
-        transition: all $easing-in 0.2s;
-        position: absolute;
-        bottom: 6px;
-        font-size: 20px;
-        left: -14px;
-        background-color: white;
-        padding: 5px;
-        border-radius: 10px;
-        cursor: pointer;
-        box-shadow: 0 15px 70px rgba(0, 0, 0, 0.9);
-    }
-
-    /* Reset button placed at top-left of the logo */
-    .reset-top-left {
-        transition:
-            transform $easing-in 0.18s,
-            box-shadow $easing-in 0.18s,
-            background-color $easing-in 0.18s;
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        background: white;
-        border: none;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-        cursor: pointer;
-        transform-origin: center;
-
-        &:hover {
-            background-color: rgba(0, 0, 0, 0.06);
-            transform: scale(1.18);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-        }
-
-        &:hover ~ .icon-upload {
-            transform: none !important;
-        }
-    }
-
-    .small-reset-btn {
-        transition:
-            transform $easing-in 0.18s,
-            box-shadow $easing-in 0.18s,
-            background-color $easing-in 0.18s;
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-
-        &:hover {
-            background-color: rgba(0, 0, 0, 0.04);
-            transform: scale(1.18);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-        }
-    }
+    display: inline-flex;
+    flex: 0 0 auto;
 }
 
 .logo {
-    transition: all $easing-in 0.2s;
+    display: block;
+    object-fit: contain;
+    border-radius: 10px;
+}
 
-    &.edit-mode {
-        cursor: pointer;
+.logo-control {
+    position: relative;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: var(--ws-surface);
+}
 
-        &:hover {
-            transform: scale(1.2);
-        }
-    }
+.icon-upload {
+    position: absolute;
+    inset: auto 2px 2px auto;
+    padding: 4px;
+    border-radius: 6px;
+    background: var(--ws-action-soft);
+    color: var(--ws-action);
+    font-size: 19px;
 }
 
 .incident {
@@ -1700,49 +1726,9 @@ footer {
     }
 }
 
-.maintenance-bg-info {
-    color: $maintenance;
-}
-
-.maintenance-icon {
-    font-size: 35px;
-    vertical-align: middle;
-}
-
-.dark .shadow-box {
-    background-color: #0d1117;
-}
-
-.status-maintenance {
-    color: $maintenance;
-    margin-right: 5px;
-}
-
-.mobile {
-    h1 {
-        font-size: 22px;
-    }
-
-    .overall-status {
-        font-size: 20px;
-    }
-}
-
-.dark {
-    .sidebar {
-        background-color: $dark-header-bg;
-        border-right-color: $dark-border-color;
-
-        .danger-zone {
-            border-top-color: $dark-border-color;
-        }
-
-        .sidebar-footer {
-            border-right-color: $dark-border-color;
-            border-top-color: $dark-border-color;
-            background-color: $dark-header-bg;
-        }
-    }
+.status-workspace .shadow-box:not(.alert) {
+    background: var(--ws-surface);
+    box-shadow: var(--ws-shadow);
 }
 
 .domain-name-list {
@@ -1753,14 +1739,10 @@ footer {
 
         .domain-input {
             flex-grow: 1;
+            min-width: 0;
             background-color: transparent;
             border: none;
-            color: $dark-font-color;
-            outline: none;
-
-            &::placeholder {
-                color: #1d2634;
-            }
+            color: var(--ws-ink);
         }
     }
 }
@@ -1772,7 +1754,8 @@ footer {
 }
 
 .refresh-info {
-    opacity: 0.7;
+    color: var(--ws-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .past-incidents-title {

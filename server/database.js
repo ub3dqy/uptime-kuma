@@ -818,6 +818,10 @@ class Database {
         }
         log.info("db", "Database closed");
 
+        if (Database.dbConfig.type === "embedded-mariadb" && EmbeddedMariaDB.hasInstance()) {
+            EmbeddedMariaDB.getInstance().stop();
+        }
+
         process.removeListener("unhandledRejection", listener);
     }
 

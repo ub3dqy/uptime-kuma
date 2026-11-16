@@ -1,7 +1,7 @@
 const { log } = require("../src/util");
 const childProcess = require("child_process");
 const fs = require("fs");
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 
 /**
  * It is only used inside the docker container
@@ -32,6 +32,8 @@ class EmbeddedMariaDB {
 
     started = false;
 
+    stopping = false;
+
     /**
      * @returns {EmbeddedMariaDB} The singleton instance
      */
@@ -52,9 +54,9 @@ class EmbeddedMariaDB {
     /**
      * Start the embedded MariaDB
      * @throws {Error} If the current user is not "node" or "root"
-     * @returns {Promise<void>|void} A promise that resolves when the MariaDB is started or void if it is already started
+     * @returns {Promise<void>} Resolves when the database is started or attached.
      */
-    start() {
+    async start() {
         // Check if the current user is "node" or "root"
         this.username = require("os").userInfo().username;
         if (this.username !== "node" && this.username !== "root") {
@@ -63,20 +65,56 @@ class EmbeddedMariaDB {
             );
         }
 
+        if (this.started) return;
+        this.stopping = false;
+        if (await this.attach()) {
+            log.info("mariadb", "Embedded MariaDB is already running, reusing the existing instance");
+            this.started = true;
+            return;
+        }
+
         this.initDB();
 
         this.startChildProcess();
 
-        return new Promise((resolve) => {
-            let interval = setInterval(() => {
+        return new Promise((resolve, reject) => {
+            const deadline = Date.now() + 60000;
+            const interval = setInterval(() => {
                 if (this.started) {
                     clearInterval(interval);
                     resolve();
+                } else if (this.stopping || Date.now() >= deadline) {
+                    clearInterval(interval);
+                    this.stop();
+                    reject(new Error("Embedded MariaDB did not start"));
                 } else {
                     log.info("mariadb", "Waiting for Embedded MariaDB to start...");
                 }
             }, 1000);
         });
+    }
+
+    /**
+     * @returns {Promise<boolean>} A running database is reused but remains owned by its original process.
+     */
+    async attach() {
+        if (!fs.existsSync(this.socketPath)) return false;
+
+        try {
+            const connection = await mysql.createConnection({
+                socketPath: this.socketPath,
+                user: this.username,
+                database: "kuma",
+                connectTimeout: 5000,
+            });
+            await connection.end();
+            return true;
+        } catch (error) {
+            // A stale socket after a crash is safe to replace. An active database that
+            // refused the connection must never be replaced by a second process.
+            if (["ENOENT", "ECONNREFUSED"].includes(error.code)) return false;
+            throw error;
+        }
     }
 
     /**
@@ -106,7 +144,7 @@ class EmbeddedMariaDB {
             this.started = false;
             log.info("mariadb", "Stopped Embedded MariaDB: " + code);
 
-            if (code !== 0) {
+            if (code !== 0 && !this.stopping) {
                 log.error("mariadb", "Try to restart Embedded MariaDB as it is not stopped by user");
                 this.startChildProcess();
             }
@@ -123,7 +161,10 @@ class EmbeddedMariaDB {
         let handler = (data) => {
             log.info("mariadb", data.toString("utf-8"));
             if (data.toString("utf-8").includes("ready for connections")) {
-                this.initDBAfterStarted();
+                this.initDBAfterStarted().catch((error) => {
+                    log.error("mariadb", error.message);
+                    this.stop();
+                });
             }
         };
 
@@ -136,9 +177,10 @@ class EmbeddedMariaDB {
      * @returns {void}
      */
     stop() {
+        this.stopping = true;
+        this.started = false;
         if (this.childProcess) {
-            this.childProcess.kill("SIGINT");
-            this.childProcess = null;
+            this.childProcess.kill("SIGTERM");
         }
     }
 
@@ -201,16 +243,19 @@ class EmbeddedMariaDB {
      * @returns {Promise<void>}
      */
     async initDBAfterStarted() {
-        const connection = mysql.createConnection({
+        const connection = await mysql.createConnection({
             socketPath: this.socketPath,
             user: this.username,
         });
 
-        let result = await connection.execute("CREATE DATABASE IF NOT EXISTS `kuma`");
-        log.debug("mariadb", "CREATE DATABASE: " + JSON.stringify(result));
+        try {
+            await connection.execute("CREATE DATABASE IF NOT EXISTS `kuma`");
+        } finally {
+            await connection.end();
+        }
 
         log.info("mariadb", "Embedded MariaDB is ready for connections");
-        this.started = true;
+        if (!this.stopping) this.started = true;
     }
 }
 

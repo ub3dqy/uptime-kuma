@@ -2,7 +2,7 @@
 
 Monitor client websites on your own server, see when they were down, and share a printable report for each client.
 
-[Try the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.1) · [Watch the report demo](https://github.com/ub3dqy/uptime-kuma/releases/download/v2.5.8-ub3dqy.preview.1/demo-report.mp4) · [Русская версия](FORK.ru.md)
+[Try the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Product overview](README.en.md) · [Русская версия](FORK.ru.md)
 
 This independent preview is based on Uptime Kuma 2.5.8, originally created by Louis Lam and contributors. It is maintained by Dima Mak / ub3dqy and uses the MIT license.
 
@@ -10,16 +10,16 @@ This independent preview is based on Uptime Kuma 2.5.8, originally created by Lo
 
 Use this preview for an independent trial with a fresh data volume. The ready-to-run archive requires Docker with Linux x86-64 containers. Docker Desktop users can run it with the Linux engine. The setup below uses SQLite.
 
-1. Download `kuma-preview-linux-amd64.tar.gz` and `SHA256SUMS.txt` from the [preview release](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.1). Compare the archive’s SHA-256 with the published value. Run `sha256sum kuma-preview-linux-amd64.tar.gz` on Linux or `Get-FileHash .\kuma-preview-linux-amd64.tar.gz` in PowerShell.
+1. Download `kuma-preview-linux-amd64.tar.gz` and `SHA256SUMS.txt` from the [preview release](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2). Compare the archive’s SHA-256 with the published value. Run `sha256sum kuma-preview-linux-amd64.tar.gz` on Linux or `Get-FileHash .\kuma-preview-linux-amd64.tar.gz` in PowerShell.
 2. In the download directory, run:
 
    ```sh
    docker load -i kuma-preview-linux-amd64.tar.gz
-   docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.1
+   docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.2
    ```
 
 3. Open <http://127.0.0.1:3001>, select **SQLite**, and create an administrator account. For a remote host, forward the port with `ssh -N -L 3001:127.0.0.1:3001 user@server`. If 3001 is taken on the Docker host, change the first 3001 in the run command and use the chosen port in the browser.
-4. Add two HTTP(S) monitors. Open **Clients**, name your group, choose both monitors, and save it. With some checks recorded, choose a period and click **Open period report**. Choose **Print / save PDF** to save a copy in your browser.
+4. Add two HTTP(S) monitors. Open **Reports**, name your group, choose both monitors, and save it. With some checks recorded, choose a period and click **Open period report**. Choose **Print / save PDF** to save a copy in your browser.
 
 The report is based on retained observations. Pick a recent period for the first run. The report shows how much of the period was observed, and labels any time without data.
 
@@ -27,7 +27,7 @@ Use `docker stop uptime-kuma-preview` to stop and `docker start uptime-kuma-prev
 
 JSONata expression checks are disabled in the ready-to-run preview, including checks that use saved expressions. Use plain HTTP(S) checks for the trial.
 
-**Build from source.** Use Node.js 24.22.3 LTS or later in the 24.x series. Clone `v2.5.8-ub3dqy.preview.1`, then run `npm run setup` from the checkout. Start with `UPTIME_KUMA_DISABLE_JSONATA=1 node server/server.js --host=127.0.0.1 --port=3001` in a POSIX shell. In PowerShell set `$env:UPTIME_KUMA_DISABLE_JSONATA = '1'` before the same `node` command.
+**Build from source.** Use Node.js 24.22.3 LTS or later in the 24.x series and npm 12.2.1. Clone `v2.5.8-ub3dqy.preview.2`, then run `npm run setup` from the checkout. Start with `UPTIME_KUMA_DISABLE_JSONATA=1 node server/server.js --host=127.0.0.1 --port=3001` in a POSIX shell. In PowerShell set `$env:UPTIME_KUMA_DISABLE_JSONATA = '1'` before the same `node` command.
 
 [Report a bug](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Suggest an improvement](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
 
@@ -117,7 +117,7 @@ are displayed as less than 100%, so rounding cannot conceal a small gap.
 
 ## Client groups and printable reports
 
-Open **Clients** in the desktop header or the mobile settings menu. Create a
+Open **Reports** in the desktop header or the mobile settings menu. Create a
 named group and select individual owned checks. One check may belong to several
 clients. Upstream monitor groups remain unchanged; their descendants are not
 expanded automatically. These groups organize this account's checks and do not

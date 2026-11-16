@@ -1,5 +1,5 @@
 let express = require("express");
-const apicache = require("../modules/apicache");
+const responseCache = require("../utils/response-cache");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
 const StatusPage = require("../model/status_page");
 const { allowDevAllOrigin, sendHttpError } = require("../util-server");
@@ -10,7 +10,7 @@ const { UptimeCalculator } = require("../uptime-calculator");
 
 let router = express.Router();
 
-let cache = apicache.middleware;
+let cache = responseCache.middleware;
 const server = UptimeKumaServer.getInstance();
 
 router.get("/status/:slug", cache("5 minutes"), async (request, response) => {
@@ -19,24 +19,10 @@ router.get("/status/:slug", cache("5 minutes"), async (request, response) => {
     await StatusPage.handleStatusPageResponse(response, server.indexHTML, slug);
 });
 
-router.get(
-    "/status/:slug/rss",
-    cache("5 minutes", null, {
-        // RSS contains request-derived absolute links; never share them across origins.
-        appendKey: (request) =>
-            JSON.stringify([
-                request.protocol,
-                request.get("host"),
-                request.get("x-forwarded-host"),
-                request.get("x-forwarded-proto"),
-            ]),
-    }),
-    async (request, response) => {
-        let slug = request.params.slug;
-        slug = slug.toLowerCase();
-        await StatusPage.handleStatusPageRSSResponse(response, slug, request);
-    }
-);
+router.get("/status/:slug/rss", cache("5 minutes"), async (request, response) => {
+    const slug = request.params.slug.toLowerCase();
+    await StatusPage.handleStatusPageRSSResponse(response, slug, request);
+});
 
 router.get("/status", cache("5 minutes"), async (request, response) => {
     let slug = "default";

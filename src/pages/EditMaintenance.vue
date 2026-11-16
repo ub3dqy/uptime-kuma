@@ -42,6 +42,8 @@
                                 <VueMultiselect
                                     id="affected_monitors"
                                     v-model="affectedMonitors"
+                                    :aria-label="$t('Affected Monitors')"
+                                    :name="$t('Affected Monitors')"
                                     :options="affectedMonitorsOptionsWithSelectAll"
                                     track-by="id"
                                     label="pathName"
@@ -78,7 +80,7 @@
                                         class="form-check-input"
                                         type="checkbox"
                                     />
-                                    <label class="form-check-label" for="show-powered-by">
+                                    <label class="form-check-label" for="show-on-all-pages">
                                         {{ $t("All Status Pages") }}
                                     </label>
                                 </div>
@@ -87,6 +89,8 @@
                                     <VueMultiselect
                                         id="selected_status_pages"
                                         v-model="selectedStatusPages"
+                                        :aria-label="$t('Status Pages')"
+                                        :name="$t('Status Pages')"
                                         :options="selectedStatusPagesOptions"
                                         track-by="id"
                                         label="name"
@@ -263,6 +267,7 @@
                                     <Datepicker
                                         v-model="maintenance.timeRange"
                                         :dark="$root.isDark"
+                                        :aria-labels="{ input: $t('Maintenance Time Window of a Day') }"
                                         timePicker
                                         :range="{ disableTimeRangeValidation: true }"
                                     />
@@ -302,10 +307,13 @@
                                         {{ $t("Effective Date Range") }}
                                     </label>
 
-                                    <div class="row">
+                                    <div class="row gy-3">
                                         <div class="col">
-                                            <div class="mb-2">{{ $t("startDateTime") }}</div>
+                                            <label class="form-label" for="maintenance-start">
+                                                {{ $t("startDateTime") }}
+                                            </label>
                                             <input
+                                                id="maintenance-start"
                                                 v-model="maintenance.dateRange[0]"
                                                 type="datetime-local"
                                                 max="9999-12-31T23:59"
@@ -315,8 +323,11 @@
                                         </div>
 
                                         <div class="col">
-                                            <div class="mb-2">{{ $t("endDateTime") }}</div>
+                                            <label class="form-label" for="maintenance-end">
+                                                {{ $t("endDateTime") }}
+                                            </label>
                                             <input
+                                                id="maintenance-end"
                                                 v-model="maintenance.dateRange[1]"
                                                 type="datetime-local"
                                                 max="9999-12-31T23:59"

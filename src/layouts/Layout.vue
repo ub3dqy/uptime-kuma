@@ -1,239 +1,213 @@
 <template>
-    <div :class="classes">
-        <div v-if="!$root.socket.connected && !$root.socket.firstConnect" class="lost-connection">
-            <div class="container-fluid">
-                {{ $root.connectionErrorMsg }}
-                <div v-if="$root.showReverseProxyGuide">
-                    {{ $t("Using a Reverse Proxy?") }}
-                    <a href="https://github.com/louislam/uptime-kuma/wiki/Reverse-Proxy" target="_blank">
-                        {{ $t("Check how to config it for WebSocket") }}
-                    </a>
-                </div>
-            </div>
+    <div class="workspace-shell" :class="classes">
+        <a class="workspace-skip" href="#workspace-main">{{ $t("workspaceSkipContent") }}</a>
+        <div
+            v-if="!$root.socket.connected && !$root.socket.firstConnect"
+            class="workspace-connection-banner"
+            role="status"
+        >
+            {{ $t("workspaceConnectionLost") }}
         </div>
-
-        <!-- Desktop header -->
-        <header v-if="!$root.isMobile" class="d-flex flex-wrap justify-content-center py-3 mb-3 border-bottom">
+        <header class="workspace-header">
+            <router-link :to="$root.projectAccess.projectOnly ? '/projects' : '/dashboard'" class="workspace-brand">
+                <img src="/images/kuma-pulse.png" width="35" height="35" alt="" />
+                <span>Uptime Kuma</span>
+            </router-link>
+            <nav
+                v-if="$root.loggedIn && !$root.isMobile && !$root.projectAccess.projectOnly"
+                :aria-label="$t('workspaceMainNavigation')"
+            >
+                <ul class="workspace-nav">
+                    <li>
+                        <router-link to="/dashboard" class="workspace-nav-link">
+                            <WorkspaceIcon name="overview" />
+                            {{ $t("workspaceNavOverview") }}
+                        </router-link>
+                    </li>
+                    <li>
+                        <router-link to="/list" class="workspace-nav-link">
+                            <WorkspaceIcon name="monitors" />
+                            {{ $t("workspaceNavServices") }}
+                        </router-link>
+                    </li>
+                    <li>
+                        <router-link to="/notifications" class="workspace-nav-link">
+                            <WorkspaceIcon name="alerts" />
+                            {{ $t("workspaceNavAlerts") }}
+                        </router-link>
+                    </li>
+                    <li>
+                        <router-link to="/clients" class="workspace-nav-link">
+                            <WorkspaceIcon name="reports" />
+                            {{ $t("workspaceNavReports") }}
+                        </router-link>
+                    </li>
+                </ul>
+            </nav>
             <router-link
-                to="/dashboard"
-                class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-dark text-decoration-none"
+                v-if="$root.loggedIn"
+                to="/projects"
+                class="ws-button ws-button-quiet workspace-project-link"
+                :aria-label="$t('projectTitle')"
             >
-                <object class="bi me-2 ms-4" width="40" height="40" data="/icon.svg" />
-                <span class="fs-4 title">{{ $t("Uptime Kuma") }}</span>
+                <WorkspaceIcon name="reports" />
+                <span>{{ $t("projectTitle") }}</span>
             </router-link>
-
-            <a
-                v-if="hasNewVersion"
-                target="_blank"
-                href="https://github.com/louislam/uptime-kuma/releases"
-                class="btn btn-primary me-3"
-            >
-                <font-awesome-icon icon="arrow-alt-circle-up" />
-                {{ $t("New Update") }}
-            </a>
-
-            <ul class="nav nav-pills">
-                <li v-if="$root.loggedIn" class="nav-item me-2">
-                    <router-link to="/clients" class="nav-link">
-                        <font-awesome-icon icon="folder" />
-                        {{ $t("clientGroupsTitle") }}
-                    </router-link>
-                </li>
-                <li v-if="$root.loggedIn" class="nav-item me-2">
-                    <router-link to="/manage-status-page" class="nav-link">
-                        <font-awesome-icon icon="stream" />
-                        {{ $t("Status Pages") }}
-                    </router-link>
-                </li>
-                <li v-if="$root.loggedIn" class="nav-item me-2">
-                    <router-link to="/dashboard" class="nav-link">
-                        <font-awesome-icon icon="tachometer-alt" />
-                        {{ $t("Dashboard") }}
-                    </router-link>
-                </li>
-                <li v-if="$root.loggedIn" class="nav-item">
-                    <div class="dropdown dropdown-profile-pic">
-                        <div class="nav-link" data-bs-toggle="dropdown">
-                            <div class="profile-pic">{{ $root.usernameFirstChar }}</div>
-                            <font-awesome-icon icon="angle-down" />
-                        </div>
-
-                        <!-- Header's Dropdown Menu -->
-                        <ul class="dropdown-menu">
-                            <!-- Username -->
-                            <li>
-                                <i18n-t
-                                    v-if="$root.username != null"
-                                    tag="span"
-                                    keypath="signedInDisp"
-                                    class="dropdown-item-text"
-                                >
-                                    <strong>{{ $root.username }}</strong>
-                                </i18n-t>
-                                <span v-if="$root.username == null" class="dropdown-item-text">
-                                    {{ $t("signedInDispDisabled") }}
-                                </span>
-                            </li>
-
-                            <li><hr class="dropdown-divider" /></li>
-
-                            <!-- Functions -->
-                            <li>
-                                <router-link
-                                    to="/maintenance"
-                                    class="dropdown-item"
-                                    :class="{ active: $route.path.includes('manage-maintenance') }"
-                                >
-                                    <font-awesome-icon icon="wrench" />
-                                    {{ $t("Maintenance") }}
-                                </router-link>
-                            </li>
-
-                            <li>
-                                <router-link
-                                    to="/settings/general"
-                                    class="dropdown-item"
-                                    :class="{ active: $route.path.includes('settings') }"
-                                >
-                                    <font-awesome-icon icon="cog" />
-                                    {{ $t("Settings") }}
-                                </router-link>
-                            </li>
-
-                            <li>
-                                <a
-                                    href="https://github.com/louislam/uptime-kuma/wiki"
-                                    class="dropdown-item"
-                                    target="_blank"
-                                >
-                                    <font-awesome-icon icon="info-circle" />
-                                    {{ $t("Help") }}
-                                </a>
-                            </li>
-
-                            <li v-if="$root.loggedIn && $root.socket.token !== 'autoLogin'">
-                                <button class="dropdown-item" @click="$root.logout">
-                                    <font-awesome-icon icon="sign-out-alt" />
-                                    {{ $t("Logout") }}
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
-            </ul>
+            <div v-if="$root.loggedIn" class="dropdown">
+                <button
+                    class="workspace-account"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    :aria-label="$t('workspaceAccount')"
+                >
+                    <span class="workspace-account-avatar">{{ $root.usernameFirstChar }}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <i18n-t
+                            v-if="$root.username != null"
+                            tag="span"
+                            keypath="signedInDisp"
+                            class="dropdown-item-text"
+                        >
+                            <strong>{{ $root.username }}</strong>
+                        </i18n-t>
+                        <span v-else class="dropdown-item-text">{{ $t("signedInDispDisabled") }}</span>
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li>
+                        <router-link to="/projects" class="dropdown-item">{{ $t("projectTitle") }}</router-link>
+                    </li>
+                    <li>
+                        <router-link to="/account" class="dropdown-item">{{ $t("projectMyAccount") }}</router-link>
+                    </li>
+                    <template v-if="!$root.projectAccess.projectOnly">
+                        <li>
+                            <router-link to="/settings/general" class="dropdown-item">{{ $t("Settings") }}</router-link>
+                        </li>
+                        <li>
+                            <router-link to="/maintenance" class="dropdown-item">{{ $t("Maintenance") }}</router-link>
+                        </li>
+                        <li>
+                            <router-link to="/manage-status-page" class="dropdown-item">
+                                {{ $t("Status Pages") }}
+                            </router-link>
+                        </li>
+                        <li>
+                            <router-link to="/events" class="dropdown-item">
+                                {{ $t("workspaceEventHistory") }}
+                            </router-link>
+                        </li>
+                        <li>
+                            <router-link to="/settings/about" class="dropdown-item">{{ $t("About") }}</router-link>
+                        </li>
+                        <li>
+                            <a
+                                href="https://github.com/ub3dqy/uptime-kuma"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="dropdown-item"
+                            >
+                                {{ $t("workspaceSource") }}
+                            </a>
+                        </li>
+                    </template>
+                    <li v-if="$root.socket.token !== 'autoLogin'">
+                        <button class="dropdown-item" type="button" @click="$root.logout">{{ $t("Logout") }}</button>
+                    </li>
+                </ul>
+            </div>
         </header>
-
-        <!-- Mobile header -->
-        <header v-else class="d-flex flex-wrap justify-content-center pt-2 pb-2 mb-3">
-            <router-link to="/dashboard" class="d-flex align-items-center text-dark text-decoration-none">
-                <object class="bi" width="40" height="40" data="/icon.svg" />
-                <span class="fs-4 title ms-2">Uptime Kuma</span>
-            </router-link>
-        </header>
-
-        <main>
+        <main id="workspace-main" class="workspace-main" tabindex="-1">
             <router-view v-if="$root.loggedIn" />
             <Login v-if="!$root.loggedIn && $root.allowLoginDialog" />
         </main>
-
-        <!-- Mobile Only -->
-        <div v-if="$root.isMobile" style="width: 100%; height: calc(60px + env(safe-area-inset-bottom))" />
-        <nav v-if="$root.isMobile && $root.loggedIn" class="bottom-nav">
-            <router-link to="/dashboard" class="nav-link">
-                <div><font-awesome-icon icon="tachometer-alt" /></div>
-                {{ $t("Home") }}
+        <nav
+            v-if="$root.isMobile && $root.loggedIn && !$root.projectAccess.projectOnly"
+            class="workspace-mobile-nav"
+            :aria-label="$t('workspaceMainNavigation')"
+        >
+            <router-link to="/dashboard">
+                <WorkspaceIcon name="overview" />
+                {{ $t("workspaceNavOverview") }}
             </router-link>
-
-            <router-link to="/list" class="nav-link">
-                <div><font-awesome-icon icon="list" /></div>
-                {{ $t("List") }}
+            <router-link to="/list">
+                <WorkspaceIcon name="monitors" />
+                {{ $t("workspaceNavServices") }}
             </router-link>
-
-            <router-link to="/add" class="nav-link">
-                <div><font-awesome-icon icon="plus" /></div>
-                {{ $t("Add") }}
+            <router-link to="/notifications">
+                <WorkspaceIcon name="alerts" />
+                {{ $t("workspaceNavAlerts") }}
             </router-link>
-
-            <router-link to="/settings" class="nav-link">
-                <div><font-awesome-icon icon="cog" /></div>
+            <router-link to="/clients">
+                <WorkspaceIcon name="reports" />
+                {{ $t("workspaceNavReports") }}
+            </router-link>
+            <router-link to="/settings">
+                <WorkspaceIcon name="settings" />
                 {{ $t("Settings") }}
             </router-link>
         </nav>
-
         <button
-            v-if="numActiveToasts != 0"
+            v-if="numActiveToasts"
             type="button"
             class="btn btn-normal clear-all-toast-btn"
+            :aria-label="$t('Close')"
             @click="clearToasts"
         >
-            <font-awesome-icon icon="times" />
+            <WorkspaceIcon name="close" />
         </button>
     </div>
 </template>
 
 <script>
 import Login from "../components/Login.vue";
-import { compareVersions } from "compare-versions";
+import WorkspaceIcon from "../components/WorkspaceIcon.vue";
 import { useToast } from "../notifications";
 const toast = useToast();
 
 export default {
-    components: {
-        Login,
-    },
-
+    components: { Login, WorkspaceIcon },
     data() {
-        return {
-            toastContainer: null,
-            numActiveToasts: 0,
-            toastContainerObserver: null,
-        };
+        return { numActiveToasts: 0, toastContainerObserver: null };
     },
-
     computed: {
-        // Theme or Mobile
         classes() {
-            const classes = {};
-            classes[this.$root.theme] = true;
-            classes["mobile"] = this.$root.isMobile;
-            return classes;
-        },
-
-        hasNewVersion() {
-            if (this.$root.info.latestVersion && this.$root.info.version) {
-                return compareVersions(this.$root.info.latestVersion, this.$root.info.version) >= 1;
-            } else {
-                return false;
-            }
+            return { [this.$root.theme]: true, mobile: this.$root.isMobile };
         },
     },
-
-    watch: {},
-
+    watch: {
+        "$route.path": "protectProjectRoute",
+        "$root.projectAccess.projectOnly": "protectProjectRoute",
+        "$root.loggedIn": "protectProjectRoute",
+    },
     mounted() {
-        this.toastContainer = document.querySelector(".bottom-right.toast-container");
-
-        // Watch the number of active toasts
-        this.toastContainerObserver = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                if (mutation.type === "childList") {
-                    this.numActiveToasts = mutation.target.children.length;
-                }
-            }
-        });
-
-        if (this.toastContainer != null) {
-            this.toastContainerObserver.observe(this.toastContainer, { childList: true });
+        const container = document.querySelector(".bottom-right.toast-container");
+        if (container) {
+            this.toastContainerObserver = new MutationObserver(() => {
+                this.numActiveToasts = container.children.length;
+            });
+            this.toastContainerObserver.observe(container, { childList: true });
         }
     },
-
     beforeUnmount() {
-        this.toastContainerObserver.disconnect();
+        this.toastContainerObserver?.disconnect();
     },
-
     methods: {
+        /** @returns {void} Participants stay inside their authorized project workspace */
+        protectProjectRoute() {
+            if (
+                this.$root.loggedIn &&
+                this.$root.projectAccess.projectOnly &&
+                !this.$route.path.startsWith("/projects") &&
+                this.$route.path !== "/account"
+            ) {
+                this.$router.replace("/projects");
+            }
+        },
         /**
-         * Clear all toast notifications.
+         * Clear the existing application's toast notifications.
          * @returns {void}
          */
         clearToasts() {
@@ -243,196 +217,11 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-@import "../assets/vars.scss";
-
-.nav-link {
-    &:hover {
-        background-color: $primary;
-        color: #fff;
-
-        .dark & {
-            background-color: $primary;
-            color: #000;
-        }
-
-        &.active {
-            background-color: $highlight;
-        }
-    }
-
-    &.status-page {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-}
-
-.bottom-nav {
-    z-index: 1000;
-    position: fixed;
-    bottom: 0;
-    height: calc(60px + env(safe-area-inset-bottom));
-    width: 100%;
-    left: 0;
-    background-color: #fff;
-    box-shadow:
-        0 15px 47px 0 rgba(0, 0, 0, 0.05),
-        0 5px 14px 0 rgba(0, 0, 0, 0.05);
-    text-align: center;
-    white-space: nowrap;
-    padding: 0 10px env(safe-area-inset-bottom);
-
-    a {
-        text-align: center;
-        width: 25%;
-        display: inline-block;
-        height: 100%;
-        padding: 8px 10px 0;
-        font-size: 13px;
-        color: #c1c1c1;
-        overflow: hidden;
-        text-decoration: none;
-
-        &.router-link-exact-active,
-        &.active {
-            color: $primary;
-            font-weight: bold;
-        }
-
-        div {
-            font-size: 20px;
-        }
-    }
-}
-
-main {
-    min-height: calc(100vh - 160px);
-}
-
-.title {
-    font-weight: bold;
-}
-
-.nav {
-    margin-right: 25px;
-}
-
-.lost-connection {
-    padding: 5px;
-    background-color: crimson;
-    color: white;
-    position: fixed;
-    width: 100%;
-    z-index: 99999;
-}
-
-// Profile Pic Button with Dropdown
-.dropdown-profile-pic {
-    user-select: none;
-
-    .nav-link {
-        cursor: pointer;
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        background-color: rgba(200, 200, 200, 0.2);
-        padding: 0.5rem 0.8rem;
-
-        &:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-    }
-
-    .dropdown-menu {
-        transition: all 0.2s;
-        padding-left: 0;
-        padding-bottom: 0;
-        margin-top: 8px !important;
-        border-radius: 16px;
-        overflow: hidden;
-
-        .dropdown-divider {
-            margin: 0;
-            border-top: 1px solid rgba(0, 0, 0, 0.4);
-            background-color: transparent;
-        }
-
-        .dropdown-item-text {
-            font-size: 14px;
-            padding-bottom: 0.7rem;
-        }
-
-        .dropdown-item {
-            padding: 0.7rem 1rem;
-        }
-
-        .dark & {
-            background-color: $dark-bg;
-            color: $dark-font-color;
-            border-color: $dark-border-color;
-
-            .dropdown-item {
-                color: $dark-font-color;
-
-                &.active {
-                    color: $dark-font-color2;
-                    background-color: $highlight !important;
-                }
-
-                &:hover {
-                    background-color: $dark-bg2;
-                }
-            }
-        }
-    }
-
-    .profile-pic {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        background-color: $primary;
-        width: 24px;
-        height: 24px;
-        margin-right: 5px;
-        border-radius: 50rem;
-        font-weight: bold;
-        font-size: 10px;
-    }
-}
-
-.dark {
-    header {
-        background-color: $dark-header-bg;
-        border-bottom-color: $dark-header-bg !important;
-
-        span {
-            color: #f0f6fc;
-        }
-    }
-
-    .bottom-nav {
-        background-color: $dark-bg;
-    }
-}
-
+<style scoped>
 .clear-all-toast-btn {
     position: fixed;
-    right: 1em;
-    bottom: 1em;
-    font-size: 1.2em;
-    padding: 9px 15px;
-    width: 48px;
-    box-shadow: 2px 2px 30px rgba(0, 0, 0, 0.2);
-    z-index: 100;
-
-    .dark & {
-        box-shadow: 2px 2px 30px rgba(0, 0, 0, 0.5);
-    }
-}
-
-@media (max-width: 770px) {
-    .clear-all-toast-btn {
-        bottom: 72px;
-    }
+    right: 18px;
+    bottom: 88px;
+    z-index: 1100;
 }
 </style>

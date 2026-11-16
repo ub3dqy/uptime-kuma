@@ -23,7 +23,7 @@ test.describe("Example Spec", () => {
         await page.getByTestId("save-button").click();
         await page.waitForURL("/dashboard/*"); // wait for the monitor to be created
 
-        await expect(page.getByTestId("monitor-list")).toContainText("example.com");
+        await expect(page.locator("main h1")).toContainText("example.com");
         await screenshot(testInfo, page);
     });
 

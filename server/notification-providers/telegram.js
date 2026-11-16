@@ -60,6 +60,18 @@ class Telegram extends NotificationProvider {
                 protect_content: notification.telegramProtectContent ?? false,
                 link_preview_options: { is_disabled: true },
             };
+            if (notification.managedDelivery && /^[a-zA-Z0-9_-]{22}$/.test(notification.telegramAlertToken || "")) {
+                params.reply_markup = {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: notification.locale === "ru" ? "Принял" : "Acknowledge",
+                                callback_data: "alert:" + notification.telegramAlertToken,
+                            },
+                        ],
+                    ],
+                };
+            }
             if (notification.telegramMessageThreadID) {
                 params.message_thread_id = notification.telegramMessageThreadID;
             }
@@ -100,10 +112,21 @@ class Telegram extends NotificationProvider {
             }
 
             let config = this.getAxiosConfigWithProxy();
+            if (notification.managedDelivery) {
+                Object.assign(config, { timeout: 15000, maxRedirects: 0, maxContentLength: 65536 });
+            }
 
-            await axios.post(`${url}/bot${notification.telegramBotToken}/sendMessage`, params, config);
+            const response = await axios.post(`${url}/bot${notification.telegramBotToken}/sendMessage`, params, config);
+            if (notification.managedDelivery && response.data?.ok !== true) {
+                const error = new Error("Telegram submission was not confirmed");
+                error.telegramRejected = response.data?.ok === false;
+                throw error;
+            }
             return okMsg;
         } catch (error) {
+            if (notification.managedDelivery) {
+                throw error;
+            }
             this.throwGeneralAxiosError(error);
         }
     }

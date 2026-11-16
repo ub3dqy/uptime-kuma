@@ -1,75 +1,120 @@
 <template>
     <!-- Group List -->
-    <Draggable v-model="$root.publicGroupList" :disabled="!editMode" item-key="id" :animation="100">
+    <Draggable v-model="$root.publicGroupList" :disabled="!editMode" item-key="id">
         <template #item="group">
-            <div class="mb-5" data-testid="group">
-                <!-- Group Title -->
-                <h2 class="group-title">
-                    <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
+            <div class="public-group mb-4" data-testid="group">
+                <div class="group-heading">
                     <font-awesome-icon
-                        v-if="editMode"
-                        icon="times"
-                        class="action remove me-3"
-                        @click="removeGroup(group.index)"
+                        v-if="editMode && showGroupDrag"
+                        icon="arrows-alt-v"
+                        class="drag"
+                        aria-hidden="true"
                     />
-                    <span class="collapse-toggle" @click="toggleGroup(group.element)">
+                    <button
+                        v-if="editMode"
+                        type="button"
+                        class="group-control remove"
+                        :aria-label="$t('workspaceRemoveItem', { name: group.element.name })"
+                        @click="removeGroup(group.index)"
+                    >
+                        <font-awesome-icon icon="times" aria-hidden="true" />
+                    </button>
+                    <button
+                        v-if="editMode"
+                        type="button"
+                        class="group-control"
+                        :aria-expanded="!isGroupCollapsed(group.element)"
+                        :aria-label="
+                            $t(isGroupCollapsed(group.element) ? 'workspaceShowGroup' : 'workspaceHideGroup', {
+                                name: group.element.name,
+                            })
+                        "
+                        @click="toggleGroup(group.element)"
+                    >
                         <font-awesome-icon
                             icon="chevron-down"
-                            class="chevron me-2"
+                            class="chevron"
                             :class="{ collapsed: isGroupCollapsed(group.element) }"
+                            aria-hidden="true"
                         />
-                    </span>
-                    <Editable
-                        v-model="group.element.name"
-                        :contenteditable="editMode"
-                        tag="span"
-                        :class="{ 'collapse-toggle': !editMode }"
-                        data-testid="group-name"
-                        @click="!editMode && toggleGroup(group.element)"
-                    />
-                </h2>
+                    </button>
+                    <h2 class="group-title">
+                        <Editable
+                            v-if="editMode"
+                            v-model="group.element.name"
+                            :contenteditable="true"
+                            tag="span"
+                            data-testid="group-name"
+                            :aria-label="$t('Name')"
+                        />
+                        <button
+                            v-else
+                            type="button"
+                            class="group-control group-label"
+                            :aria-expanded="!isGroupCollapsed(group.element)"
+                            data-testid="group-name"
+                            @click="toggleGroup(group.element)"
+                        >
+                            <font-awesome-icon
+                                icon="chevron-down"
+                                class="chevron"
+                                :class="{ collapsed: isGroupCollapsed(group.element) }"
+                                aria-hidden="true"
+                            />
+                            <span>{{ group.element.name }}</span>
+                        </button>
+                    </h2>
+                </div>
 
                 <transition name="slide-fade-up">
-                    <div v-if="!isGroupCollapsed(group.element)" class="shadow-box monitor-list mt-4 position-relative">
+                    <div v-if="!isGroupCollapsed(group.element)" class="shadow-box monitor-list position-relative">
                         <div v-if="group.element.monitorList.length === 0" class="text-center no-monitor-msg">
                             {{ $t("No Monitors") }}
                         </div>
 
                         <!-- Monitor List -->
-                        <!-- animation is not working, no idea why -->
                         <Draggable
                             v-model="group.element.monitorList"
                             class="monitor-list"
                             group="same-group"
                             :disabled="!editMode"
-                            :animation="100"
                             item-key="id"
                         >
                             <template #item="monitor">
                                 <div class="item" data-testid="monitor">
-                                    <div class="row">
-                                        <div class="col-9 col-xl-6 small-padding">
+                                    <div class="monitor-row">
+                                        <div class="monitor-meta">
                                             <div class="info">
                                                 <font-awesome-icon
                                                     v-if="editMode"
                                                     icon="arrows-alt-v"
-                                                    class="action drag me-3"
+                                                    class="drag"
+                                                    aria-hidden="true"
                                                 />
-                                                <font-awesome-icon
+                                                <button
                                                     v-if="editMode"
-                                                    icon="times"
-                                                    class="action remove me-3"
+                                                    type="button"
+                                                    class="group-control remove"
+                                                    :aria-label="
+                                                        $t('workspaceRemoveItem', { name: monitor.element.name })
+                                                    "
                                                     @click="removeMonitor(group.index, monitor.index)"
-                                                />
+                                                >
+                                                    <font-awesome-icon icon="times" aria-hidden="true" />
+                                                </button>
 
-                                                <font-awesome-icon
+                                                <button
                                                     v-if="editMode"
-                                                    icon="cog"
-                                                    class="action me-3 ms-0"
-                                                    :class="{ 'link-active': true, 'btn-link': true }"
+                                                    type="button"
+                                                    class="group-control"
+                                                    :aria-label="
+                                                        $t('workspaceEditItem', { name: monitor.element.name })
+                                                    "
                                                     data-testid="monitor-settings"
                                                     @click="$refs.monitorSettingDialog.show(group, monitor)"
-                                                />
+                                                >
+                                                    <font-awesome-icon icon="cog" aria-hidden="true" />
+                                                </button>
                                                 <Status
                                                     v-if="showOnlyLastHeartbeat"
                                                     :status="statusOfLastHeartbeat(monitor.element.id)"
@@ -115,7 +160,7 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div :key="$root.userHeartbeatBar" class="col-3 col-xl-6">
+                                        <div :key="$root.userHeartbeatBar" class="monitor-history">
                                             <HeartbeatBar size="mid" :monitor-id="monitor.element.id" />
                                         </div>
                                     </div>
@@ -323,14 +368,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../assets/vars";
-
 .extra-info {
     display: flex;
+    flex-wrap: wrap;
     margin-bottom: 0.5rem;
 }
 
-.extra-info > div > div:first-child {
+.extra-info > div > :deep(div:first-child) {
     margin-left: 0 !important;
 }
 
@@ -345,68 +389,94 @@ export default {
     min-height: 46px;
 }
 
+.monitor-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+    align-items: center;
+    gap: 12px;
+    padding: 8px 4px;
+}
+
+.monitor-meta .info,
+.group-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.monitor-list .item .monitor-meta .info {
+    min-width: 0;
+    overflow: visible;
+    white-space: normal;
+}
+
+.public-group > .monitor-list {
+    border: 1px solid var(--ws-border);
+    padding: 10px 12px;
+}
+
 .item-name {
-    padding-left: 5px;
-    padding-right: 5px;
     margin: 0;
-    display: inline-block;
-}
-
-.btn-link {
-    color: #bbbbbb;
-    margin-left: 5px;
-}
-
-.link-active {
-    color: $primary;
-}
-
-.flip-list-move {
-    transition: transform 0.5s;
-}
-
-.no-move {
-    transition: transform 0s;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .drag {
-    color: #bbb;
+    color: var(--ws-muted);
     cursor: grab;
 }
 
-.remove {
-    color: $danger;
-}
-
 .group-title {
-    span {
-        display: inline-block;
-        min-width: 15px;
-    }
+    margin: 0;
+    font-size: clamp(17px, 3vw, 23px);
+    font-weight: 680;
+    overflow-wrap: anywhere;
 }
 
-.collapse-toggle {
-    cursor: pointer;
-    padding: 2px;
+.group-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    gap: 10px;
+    padding: 5px 7px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--ws-ink);
+    background: transparent;
+    text-align: start;
+}
+
+.group-control:hover {
+    background: var(--ws-action-soft);
+    color: var(--ws-action);
+}
+
+.group-control.remove {
+    color: var(--ws-danger);
 }
 
 .chevron {
-    font-size: 0.8em;
-    color: #bbb;
-    transition: all 0.2s $easing-in;
+    flex: 0 0 auto;
+    font-size: 0.72em;
+    color: var(--ws-muted);
+    transition: transform 180ms ease;
 
     &.collapsed {
         transform: rotate(-90deg);
     }
 }
 
-.mobile {
-    .item {
-        padding: 13px 0 10px;
+@media (max-width: 620px) {
+    .monitor-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
     }
-}
 
-.bg-maintenance {
-    background-color: $maintenance;
+    .monitor-history {
+        min-width: 0;
+    }
 }
 </style>

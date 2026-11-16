@@ -1,6 +1,6 @@
 <template>
-    <div>
-        <div v-if="$root.isMobile" class="shadow-box mb-3">
+    <div class="workspace-settings-page">
+        <div v-if="$root.isMobile && !currentPage" class="settings-shortcuts mb-3">
             <router-link to="/clients" class="nav-link">
                 <font-awesome-icon icon="folder" />
                 {{ $t("clientGroupsTitle") }}
@@ -15,55 +15,52 @@
             </router-link>
         </div>
 
-        <h1 v-show="show" class="mb-3">
+        <router-link v-if="$root.isMobile && currentPage" to="/settings" class="ws-button ws-button-quiet mb-3">
+            <font-awesome-icon icon="chevron-down" rotation="90" aria-hidden="true" />
+            {{ $t("Settings") }}
+        </router-link>
+        <h1 v-if="!$root.isMobile || !currentPage" class="mb-3">
             {{ $t("Settings") }}
         </h1>
 
-        <div class="shadow-box shadow-box-settings">
-            <div class="row">
-                <div v-if="showSubMenu" class="settings-menu col-lg-3 col-md-5">
-                    <router-link v-for="(item, key) in subMenus" :key="key" :to="`/settings/${key}`">
-                        <div class="menu-item">
-                            {{ item.title }}
-                        </div>
-                    </router-link>
+        <div class="settings-layout" :class="{ 'with-menu': showSubMenu }">
+            <nav v-if="showSubMenu" class="settings-menu" :aria-label="$t('Settings')">
+                <router-link v-for="(item, key) in subMenus" :key="key" :to="`/settings/${key}`">
+                    <div class="menu-item">
+                        {{ item.title }}
+                    </div>
+                </router-link>
 
-                    <!-- Logout Button -->
-                    <a
-                        v-if="$root.isMobile && $root.loggedIn && $root.socket.token !== 'autoLogin'"
-                        class="logout"
-                        @click.prevent="$root.logout"
-                    >
-                        <div class="menu-item">
-                            <font-awesome-icon icon="sign-out-alt" />
-                            {{ $t("Logout") }}
-                        </div>
-                    </a>
+                <button
+                    v-if="$root.isMobile && $root.loggedIn && $root.socket.token !== 'autoLogin'"
+                    type="button"
+                    class="menu-item logout"
+                    @click="$root.logout"
+                >
+                    <font-awesome-icon icon="sign-out-alt" aria-hidden="true" />
+                    {{ $t("Logout") }}
+                </button>
+            </nav>
+            <section v-if="currentPage" class="settings-content">
+                <component :is="$root.isMobile ? 'h1' : 'h2'" class="settings-content-header">
+                    {{ subMenus[currentPage].title }}
+                </component>
+                <div class="settings-content-body">
+                    <router-view v-slot="{ Component }">
+                        <transition name="slide-fade" mode="out-in">
+                            <component :is="Component" />
+                        </transition>
+                    </router-view>
                 </div>
-                <div class="settings-content col-lg-9 col-md-7">
-                    <div v-if="currentPage" class="settings-content-header">
-                        {{ subMenus[currentPage].title }}
-                    </div>
-                    <div class="mx-3">
-                        <router-view v-slot="{ Component }">
-                            <transition name="slide-fade" appear>
-                                <component :is="Component" />
-                            </transition>
-                        </router-view>
-                    </div>
-                </div>
-            </div>
+            </section>
         </div>
     </div>
 </template>
 
 <script>
-import { useRoute } from "vue-router";
-
 export default {
     data() {
         return {
-            show: true,
             settings: {},
             settingsLoaded: false,
         };
@@ -71,9 +68,9 @@ export default {
 
     computed: {
         currentPage() {
-            let pathSplit = useRoute().path.split("/");
+            let pathSplit = this.$route.path.split("/");
             let pathEnd = pathSplit[pathSplit.length - 1];
-            if (!pathEnd || pathEnd === "settings") {
+            if (!Object.hasOwn(this.subMenus, pathEnd)) {
                 return null;
             }
             return pathEnd;
@@ -246,81 +243,78 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../assets/vars.scss";
-
-.shadow-box-settings {
-    padding: 20px;
-    min-height: calc(100vh - 155px);
+.settings-layout {
+    display: grid;
+    align-items: start;
+    gap: 16px;
+    grid-template-columns: minmax(0, 1fr);
 }
 
-footer {
-    color: $secondary-text;
-    font-size: 13px;
-    margin-top: 20px;
-    padding-bottom: 30px;
-    text-align: center;
-}
-
-.settings-menu {
-    a {
-        text-decoration: none !important;
-    }
-
-    .menu-item {
-        border-radius: 10px;
-        margin: 0.5em;
-        padding: 0.7em 1em;
-        cursor: pointer;
-        border-left-width: 0;
-        transition: all ease-in-out 0.1s;
-    }
-
-    .menu-item:hover {
-        background: $highlight-white;
-
-        .dark & {
-            background: $dark-header-bg;
-        }
-    }
-
-    .active .menu-item {
-        background: $highlight-white;
-        border-left: 4px solid $primary;
-        border-top-left-radius: 0;
-        border-bottom-left-radius: 0;
-
-        .dark & {
-            background: $dark-header-bg;
-        }
+@media (min-width: 768px) {
+    .settings-layout.with-menu {
+        grid-template-columns: minmax(168px, 225px) minmax(0, 1fr);
     }
 }
 
+.settings-shortcuts,
+.settings-menu,
 .settings-content {
-    .settings-content-header {
-        width: calc(100% + 20px);
-        border-bottom: 1px solid #dee2e6;
-        border-radius: 0 10px 0 0;
-        margin-top: -20px;
-        margin-right: -20px;
-        padding: 12.5px 1em;
-        font-size: 26px;
+    min-width: 0;
+    border: 1px solid var(--ws-border);
+    border-radius: 14px;
+    background: var(--ws-surface);
+    box-shadow: var(--ws-shadow);
+}
 
-        .dark & {
-            background: $dark-header-bg;
-            border-bottom: 0;
-        }
+.settings-shortcuts,
+.settings-menu {
+    padding: 8px;
+}
 
-        .mobile & {
-            padding: 15px 0 0 0;
+.settings-menu a {
+    display: block;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--ws-ink);
+}
 
-            .dark & {
-                background-color: transparent;
-            }
-        }
-    }
+.settings-shortcuts .nav-link,
+.settings-menu .menu-item {
+    min-height: 44px;
+    padding: 10px 12px;
+    overflow-wrap: anywhere;
+}
+
+.settings-shortcuts .nav-link:hover,
+.settings-menu a:hover,
+.settings-menu a[aria-current="page"] {
+    border-radius: 8px;
+    color: var(--ws-action);
+    background: var(--ws-action-soft);
+}
+
+.settings-menu a[aria-current="page"] {
+    font-weight: 700;
+}
+
+.settings-content-header {
+    margin: 0;
+    padding: 16px clamp(14px, 3vw, 26px);
+    border-bottom: 1px solid var(--ws-border);
+    font-size: clamp(20px, 3vw, 26px);
+    font-weight: 700;
+}
+
+.settings-content-body {
+    padding: 0 clamp(14px, 3vw, 26px) 20px;
 }
 
 .logout {
-    color: $danger !important;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--ws-border);
+    color: var(--ws-danger);
+    background: transparent;
+    text-align: start;
 }
 </style>

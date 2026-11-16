@@ -4,7 +4,7 @@ const dayjs = require("dayjs");
 const { log } = require("../../src/util");
 const ImageDataURI = require("../image-data-uri");
 const Database = require("../database");
-const apicache = require("../modules/apicache");
+const responseCache = require("../utils/response-cache");
 const StatusPage = require("../model/status_page");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
 const { Settings } = require("../settings");
@@ -416,7 +416,7 @@ module.exports.statusPageSocketHandler = (socket) => {
                 await Settings.set("entryPage", server.entryPage, "general");
             }
 
-            apicache.clear();
+            responseCache.clear();
 
             callback({
                 ok: true,
@@ -506,7 +506,7 @@ module.exports.statusPageSocketHandler = (socket) => {
                 // Delete status_page
                 await R.exec("DELETE FROM status_page WHERE id = ? ", [statusPageID]);
 
-                apicache.clear();
+                responseCache.clear();
             } else {
                 throw new Error("Status Page is not found");
             }

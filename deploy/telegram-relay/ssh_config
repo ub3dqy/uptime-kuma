@@ -1,0 +1,23 @@
+Host kuma-telegram-peer
+    HostName __PEER_IPV4__
+    User kuma-tg-peer
+    Port 22
+    AddressFamily inet
+    IdentityFile /var/lib/uptime-kuma-telegram-tunnel/identity
+    IdentityAgent none
+    IdentitiesOnly yes
+    UserKnownHostsFile /var/lib/uptime-kuma-telegram-tunnel/known_hosts
+    GlobalKnownHostsFile /dev/null
+    StrictHostKeyChecking yes
+    BatchMode yes
+    RequestTTY no
+    SessionType none
+    DynamicForward __DOCKER_GATEWAY_IPV4__:19080
+    ExitOnForwardFailure yes
+    ServerAliveInterval 15
+    ServerAliveCountMax 2
+    ConnectTimeout 8
+    ConnectionAttempts 1
+    ForwardAgent no
+    ForwardX11 no
+    LogLevel ERROR

@@ -1,5 +1,7 @@
+ARG NODE_VERSION=24.22.3
+
 # Download Apprise deb package
-FROM node:24.22.3-bookworm-slim AS download-apprise
+FROM node:${NODE_VERSION}-bookworm-slim AS download-apprise
 WORKDIR /app
 ARG APPRISE_VERSION=2.1.0-1
 # APT verifies the signed Debian index and the package hash before the file is copied.
@@ -13,8 +15,10 @@ RUN apt-get update && \
 
 # Base Image (Slim)
 # If the image changed, the second stage image should be changed too
-FROM node:24.22.3-bookworm-slim AS base2-slim
+FROM node:${NODE_VERSION}-bookworm-slim AS base2-slim
 ARG TARGETPLATFORM
+
+RUN npm install --global --ignore-scripts --no-fund --no-audit --min-release-age=14 npm@12.2.1
 
 # Specify --no-install-recommends to skip unused dependencies, make the base much smaller!
 # sqlite3 = for debugging

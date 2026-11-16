@@ -221,8 +221,12 @@ class UptimeKumaServer {
      * @returns {Promise<object>} List of monitors
      */
     async sendMonitorList(socket) {
-        let list = await this.getMonitorJSONList(socket.userID);
-        this.io.to(socket.userID).emit("monitorList", list);
+        const userID = socket.userID;
+        let list = await this.getMonitorJSONList(userID);
+        if (socket.userID !== userID) {
+            return {};
+        }
+        this.io.to(userID).emit("monitorList", list);
         return list;
     }
 
@@ -233,9 +237,10 @@ class UptimeKumaServer {
      * @returns {Promise<void>}
      */
     async sendUpdateMonitorIntoList(socket, monitorID) {
-        let list = await this.getMonitorJSONList(socket.userID, monitorID);
-        if (list && list[monitorID]) {
-            this.io.to(socket.userID).emit("updateMonitorIntoList", list);
+        const userID = socket.userID;
+        let list = await this.getMonitorJSONList(userID, monitorID);
+        if (socket.userID === userID && list && list[monitorID]) {
+            this.io.to(userID).emit("updateMonitorIntoList", list);
         }
     }
 
@@ -307,8 +312,10 @@ class UptimeKumaServer {
      */
     async getMaintenanceJSONList(userID) {
         let result = {};
-        for (let maintenanceID in this.maintenanceList) {
-            result[maintenanceID] = await this.maintenanceList[maintenanceID].toJSON();
+        for (const maintenance of Object.values(this.maintenanceList)) {
+            if (maintenance.user_id === userID) {
+                result[maintenance.id] = await maintenance.toJSON();
+            }
         }
         return result;
     }

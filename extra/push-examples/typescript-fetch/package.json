@@ -5,6 +5,6 @@
         "bun": "bun index.ts"
     },
     "engines": {
-        "node": ">=24.22.2 <25"
+        "node": ">=24.22.3 <25"
     }
 }

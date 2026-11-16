@@ -26,3 +26,7 @@ extra/exe-builder/obj
 .vs
 .vscode
 .devcontainer
+
+# Local Python test artifacts
+__pycache__/
+*.pyc

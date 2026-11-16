@@ -307,10 +307,8 @@ test.describe("Retained history CSV", () => {
         await page.getByTestId("slug-input").fill("dependency-upgrade");
         await page.getByTestId("submit-button").click();
         await page.waitForURL(/\/status\/dependency-upgrade(?:\?.*)?$/);
-        const edit = page.getByTestId("edit-button");
-        if (await edit.isVisible()) {
-            await edit.click();
-        }
+        // Newly created pages enter edit mode asynchronously through ?edit.
+        await expect(page.getByTestId("edit-sidebar")).toBeVisible();
         const editor = page.getByTestId("custom-css-input").locator("textarea");
         await editor.fill("body { --upgrade-proof: 42; }");
         await page.locator("h1 [contenteditable=true]").fill("Updated title");

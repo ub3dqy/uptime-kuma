@@ -1,14 +1,16 @@
 {
     "name": "uptime-kuma",
-    "version": "2.5.8-ub3dqy.preview.1",
+    "version": "2.5.8-ub3dqy.preview.2",
     "license": "MIT",
     "repository": {
         "type": "git",
         "url": "https://github.com/ub3dqy/uptime-kuma.git"
     },
     "engines": {
-        "node": ">=24.22.3 <25"
+        "node": ">=24.22.3 <25",
+        "npm": ">=12.2.1 <13"
     },
+    "packageManager": "npm@12.2.1",
     "scripts": {
         "lint:js": "eslint .",
         "lint:js-prod": "npm run lint:js",
@@ -26,12 +28,13 @@
         "start-server-dev": "cross-env NODE_ENV=development node server/server.js",
         "start-server-dev:watch": "cross-env NODE_ENV=development node --watch server/server.js",
         "build": "vite build --config ./config/vite.config.mjs",
-        "test": "npm run test-backend && npm run test-e2e",
+        "test": "npm run test-backend && npm run test-e2e && npm run test-workspace",
         "test-with-build": "npm run build && npm test",
         "test-backend": "node test/test-backend.mjs",
         "test-backend-22": "cross-env TEST_BACKEND=1 node --test --test-reporter=spec \"test/backend-test/**/*.js\"",
         "test-backend-20": "cross-env TEST_BACKEND=1 node --test --test-reporter=spec test/backend-test",
         "test-e2e": "playwright test --config ./config/playwright.config.js",
+        "test-workspace": "node test/e2e/helpers/run-workspace.cjs",
         "test-e2e-ui": "playwright test --config ./config/playwright.config.js --ui --ui-port=51063",
         "playwright-codegen": "playwright codegen localhost:3000 --save-storage=./private/e2e-auth.json",
         "playwright-show-report": "playwright show-report ./private/playwright-report",
@@ -94,9 +97,11 @@
         "express-static-gzip": "3.0.2",
         "feed": "6.0.0",
         "form-data": "4.0.6",
+        "fresh": "2.0.0",
         "gamedig": "5.3.3",
         "globalping": "0.4.0",
         "html-escaper": "3.0.3",
+        "http-cache-semantics": "4.3.0",
         "http-cookie-agent": "8.0.0",
         "http-graceful-shutdown": "4.0.0",
         "http-proxy-agent": "9.1.0",
@@ -234,7 +239,7 @@
         "tar": "$tar",
         "prom-client": "$prom-client",
         "glob@>=9": "14.0.3",
-        "minimatch": "11.0.1"
+        "minimatch": "11.0.3"
     },
     "allowScripts": {
         "@parcel/watcher@2.6.0": true,

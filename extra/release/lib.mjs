@@ -90,7 +90,7 @@ export function getRepoNames() {
         // Split by comma
         return process.env.RELEASE_REPO_NAMES.split(",").map((name) => name.trim());
     }
-    return ["louislam/uptime-kuma", "ghcr.io/louislam/uptime-kuma"];
+    return ["ub3dqy/uptime-kuma", "ghcr.io/ub3dqy/uptime-kuma"];
 }
 
 /**
@@ -121,7 +121,7 @@ export function buildImage(
     target,
     buildArgs = "",
     dockerfile = "docker/dockerfile",
-    platform = "linux/amd64,linux/arm64,linux/arm/v7"
+    platform = "linux/amd64,linux/arm64"
 ) {
     let args = ["buildx", "build", "-f", dockerfile, "--platform", platform];
 
@@ -142,7 +142,10 @@ export function buildImage(
     args = [...args, ".", "--push"];
 
     if (!dryRun) {
-        childProcess.spawnSync("docker", args, { stdio: "inherit" });
+        const result = childProcess.spawnSync("docker", args, { stdio: "inherit" });
+        if (result.status !== 0) {
+            throw new Error("Docker image build failed", { cause: result.error });
+        }
     } else {
         console.log(`[DRY RUN] docker ${args.join(" ")}`);
     }
@@ -386,50 +389,52 @@ export async function uploadReleaseAssets(version, files) {
  * @returns {void}
  */
 export function buildAllImages(repoNames, version, isBeta) {
+    const full = `BASE_IMAGE=${process.env.RELEASE_BASE_IMAGE || "uptime-kuma-base24:local"}`;
+    const slim = `BASE_IMAGE=${process.env.RELEASE_BASE_IMAGE_SLIM || "uptime-kuma-base24-slim:local"}`;
     if (isBeta) {
         // Build slim image (rootless)
         buildImage(
             repoNames,
             ["beta-slim-rootless", ver(version, "slim-rootless")],
             "rootless",
-            "BASE_IMAGE=louislam/uptime-kuma:base2-slim"
+            slim
         );
 
         // Build full image (rootless)
-        buildImage(repoNames, ["beta-rootless", ver(version, "rootless")], "rootless");
+        buildImage(repoNames, ["beta-rootless", ver(version, "rootless")], "rootless", full);
 
         // Build slim image
         buildImage(
             repoNames,
             ["beta-slim", ver(version, "slim")],
             "release",
-            "BASE_IMAGE=louislam/uptime-kuma:base2-slim"
+            slim
         );
 
         // Build full image
-        buildImage(repoNames, ["beta", version], "release");
+        buildImage(repoNames, ["beta", version], "release", full);
     } else {
         // Build slim image (rootless)
         buildImage(
             repoNames,
             ["next-slim-rootless", "2-slim-rootless", ver(version, "slim-rootless")],
             "rootless",
-            "BASE_IMAGE=louislam/uptime-kuma:base2-slim"
+            slim
         );
 
         // Build full image (rootless)
-        buildImage(repoNames, ["next-rootless", "2-rootless", ver(version, "rootless")], "rootless");
+        buildImage(repoNames, ["next-rootless", "2-rootless", ver(version, "rootless")], "rootless", full);
 
         // Build slim image
         buildImage(
             repoNames,
             ["next-slim", "2-slim", ver(version, "slim")],
             "release",
-            "BASE_IMAGE=louislam/uptime-kuma:base2-slim"
+            slim
         );
 
         // Build full image
-        buildImage(repoNames, ["next", "2", version], "release");
+        buildImage(repoNames, ["next", "2", version], "release", full);
     }
 }
 

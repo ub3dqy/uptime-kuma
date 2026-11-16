@@ -1,0 +1,51 @@
+services:
+  ai:
+    image: ${KUMA_AI_WORKER_IMAGE:?Set the qualified immutable image}
+    pull_policy: never
+    command: [node, extra/project-ai-worker.cjs]
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.25
+    mem_limit: 192m
+    memswap_limit: 192m
+    ulimits:
+      core: {soft: 0, hard: 0}
+    pids_limit: 64
+    stop_grace_period: 20s
+    environment:
+      NODE_ENV: production
+      UPTIME_KUMA_PORT: "3047"
+    ports:
+      - "127.0.0.1:3047:3047"
+    volumes:
+      - type: bind
+        source: ./config.json
+        target: /app/worker-config.json
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./data
+        target: /app/worker-data
+        bind: { create_host_path: false }
+    tmpfs:
+      - /tmp:size=16777216,mode=1777
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3047/health',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: 2m, max-file: "2" }
+    labels:
+      com.ub3dqy.ai-worker: uptime-kuma

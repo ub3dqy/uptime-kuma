@@ -16,10 +16,10 @@
 
             <!-- Server Timezone -->
             <div class="mb-4">
-                <label for="timezone" class="form-label">
+                <label for="server-timezone" class="form-label">
                     {{ $t("Server Timezone") }}
                 </label>
-                <select id="timezone" v-model="settings.serverTimezone" class="form-select">
+                <select id="server-timezone" v-model="settings.serverTimezone" class="form-select">
                     <option value="UTC">UTC</option>
                     <option v-for="(timezone, index) in timezoneList" :key="index" :value="timezone.value">
                         {{ timezone.name }}
@@ -189,16 +189,16 @@
 
             <!-- Chrome Executable -->
             <div class="mb-4">
-                <label class="form-label" for="primaryBaseURL">
+                <label class="form-label" for="chrome-executable">
                     {{ $t("chromeExecutable") }}
                 </label>
 
                 <div class="input-group mb-3">
                     <input
-                        id="primaryBaseURL"
+                        id="chrome-executable"
                         v-model="settings.chromeExecutable"
                         class="form-control"
-                        name="primaryBaseURL"
+                        name="chromeExecutable"
                         :placeholder="$t('chromeExecutableAutoDetect')"
                     />
                     <button class="btn btn-outline-primary" type="button" @click="testChrome">

@@ -2,11 +2,29 @@
     <transition name="slide-fade" appear>
         <div>
             <h1 class="mb-3">{{ pageName }}</h1>
+            <MonitorPresets v-if="isAdd" @select="applyPreset" />
             <form @submit.prevent="submit">
                 <div class="shadow-box shadow-box-with-fixed-bottom-bar">
                     <div class="row">
                         <div class="col-md-6">
                             <h2 class="mb-2">{{ $t("General") }}</h2>
+
+                            <label
+                                v-if="['http', 'keyword', 'json-query'].includes(monitor.type)"
+                                class="ws-response-limit"
+                            >
+                                {{ $t("stage2MaximumResponse") }}
+                                <input
+                                    v-model.number="monitor.max_response_time"
+                                    class="form-control"
+                                    type="number"
+                                    min="1"
+                                    max="3600000"
+                                    :placeholder="$t('stage2NoSpeedLimit')"
+                                    data-testid="response-time-limit"
+                                />
+                                <small class="form-text">{{ $t("stage2MaximumResponseHelp") }}</small>
+                            </label>
 
                             <i18n-t
                                 v-if="monitor.type === 'globalping'"
@@ -306,8 +324,19 @@
                                 </div>
                             </div>
 
+                            <BrowserJourneySteps
+                                v-if="monitor.type === 'real-browser'"
+                                v-model="monitor.browserSteps"
+                                class="my-3"
+                            />
+                            <label v-if="monitor.type === 'http'" class="form-check my-3">
+                                <input v-model="monitor.witnessSite" class="form-check-input" type="checkbox" />
+                                <span class="form-check-label">{{ $t("witnessSiteEnable") }}</span>
+                                <small class="form-text d-block">{{ $t("witnessSiteHelp") }}</small>
+                            </label>
+
                             <!-- Remote Browser -->
-                            <div v-if="monitor.type === 'real-browser'" class="my-3">
+                            <div v-if="monitor.type === 'real-browser' && !monitor.browserSteps?.length" class="my-3">
                                 <!-- Toggle -->
                                 <div class="my-3 form-check">
                                     <input
@@ -2679,8 +2708,8 @@
 
                                 <!-- Method -->
                                 <div class="my-3">
-                                    <label for="method" class="form-label">{{ $t("Method") }}</label>
-                                    <select id="method" v-model="monitor.authMethod" class="form-select">
+                                    <label for="http-auth-method" class="form-label">{{ $t("Method") }}</label>
+                                    <select id="http-auth-method" v-model="monitor.authMethod" class="form-select">
                                         <option :value="null">
                                             {{ $t("None") }}
                                         </option>
@@ -2913,8 +2942,8 @@
 
                                 <!-- Method -->
                                 <div class="my-3">
-                                    <label for="method" class="form-label">{{ $t("Method") }}</label>
-                                    <select id="method" v-model="monitor.authMethod" class="form-select">
+                                    <label for="json-auth-method" class="form-label">{{ $t("Method") }}</label>
+                                    <select id="json-auth-method" v-model="monitor.authMethod" class="form-select">
                                         <option :value="null">
                                             {{ $t("None") }}
                                         </option>
@@ -3281,6 +3310,8 @@
 </template>
 
 <script>
+import MonitorPresets from "../components/MonitorPresets.vue";
+import BrowserJourneySteps from "../components/BrowserJourneySteps.vue";
 import VueMultiselect from "vue-multiselect";
 import { useToast } from "../notifications";
 import ActionSelect from "../components/ActionSelect.vue";
@@ -3375,6 +3406,8 @@ const monitorDefaults = {
     gamedigToken: "",
     remote_browser: null,
     screenshot_delay: 0,
+    browserSteps: [],
+    witnessSite: false,
     rabbitmqNodes: [],
     rabbitmqUsername: "",
     rabbitmqPassword: "",
@@ -3389,6 +3422,8 @@ const monitorDefaults = {
 
 export default {
     components: {
+        MonitorPresets,
+        BrowserJourneySteps,
         HiddenInput,
         ActionSelect,
         ProxyDialog,
@@ -3414,6 +3449,7 @@ export default {
             },
             domainExpiryUnsupportedReason: null,
             checkDomainDebounce: null,
+            domainCheckRequest: 0,
             acceptedStatusCodeOptions: [],
             acceptedWebsocketCodeOptions: [],
             dnsresolvetypeOptions: [],
@@ -3786,6 +3822,9 @@ message HealthCheckResponse {
         },
 
         "monitor.type"(newType, oldType) {
+            if (!["http", "keyword", "json-query"].includes(newType)) {
+                this.monitor.max_response_time = null;
+            }
             this.checkDomain();
 
             if (newType === "pm2") {
@@ -4038,7 +4077,19 @@ message HealthCheckResponse {
         this.globalpingdnsresolvetypeoptions = globalpingdnsresolvetypeoptions;
         this.kafkaSaslMechanismOptions = kafkaSaslMechanismOptions;
     },
+    beforeUnmount() {
+        clearTimeout(this.checkDomainDebounce);
+        this.domainCheckRequest++;
+    },
+
     methods: {
+        /**
+         * @param {object} preset Safe preset fields
+         * @returns {void} Keep name, credentials and target untouched
+         */
+        applyPreset(preset) {
+            Object.assign(this.monitor, preset);
+        },
         loadPM2ProcessList() {
             this.pm2ProcessLoading = true;
             this.pm2ProcessError = "";
@@ -4570,7 +4621,8 @@ message HealthCheckResponse {
         // Check Domain
         // Do nothing if not checked
         checkDomain() {
-            console.log("checkDomain called");
+            const request = ++this.domainCheckRequest;
+            const owner = this.$root.username;
             if (this.checkDomainDebounce != null) {
                 clearTimeout(this.checkDomainDebounce);
             }
@@ -4589,14 +4641,25 @@ message HealthCheckResponse {
                     grpcUrl,
                 };
 
-                this.$root.getSocket().emit("checkDomain", data, (res) => {
-                    console.log(data);
-                    if (!res.ok) {
-                        this.domainExpiryUnsupportedReason = res.msgi18n ? this.$t(res.msg, res.meta) : res.msg;
-                    } else {
-                        this.domainExpiryUnsupportedReason = null;
-                    }
-                });
+                this.$root
+                    .getSocket()
+                    .timeout(10000)
+                    .emit("checkDomain", data, (error, res) => {
+                        if (
+                            request !== this.domainCheckRequest ||
+                            !this.$root.loggedIn ||
+                            owner !== this.$root.username
+                        ) {
+                            return;
+                        }
+                        if (error || !res) {
+                            this.domainExpiryUnsupportedReason = this.$t("workspaceDomainCheckUnavailable");
+                        } else if (!res.ok) {
+                            this.domainExpiryUnsupportedReason = res.msgi18n ? this.$t(res.msg, res.meta) : res.msg;
+                        } else {
+                            this.domainExpiryUnsupportedReason = null;
+                        }
+                    });
             }, 500);
         },
     },

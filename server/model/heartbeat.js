@@ -39,6 +39,8 @@ class Heartbeat extends BeanModel {
             important: this._important,
             duration: this._duration,
             retries: this._retries,
+            check_interval: this._checkInterval ?? null,
+            check_session: this._checkSession ?? null,
             response: this._response,
         };
     }
@@ -58,6 +60,8 @@ class Heartbeat extends BeanModel {
             important: this._important,
             duration: this._duration,
             retries: this._retries,
+            check_interval: this._checkInterval ?? null,
+            check_session: this._checkSession ?? null,
             response: opts?.decodeResponse ? await Heartbeat.decodeResponseValue(this._response) : undefined,
         };
     }

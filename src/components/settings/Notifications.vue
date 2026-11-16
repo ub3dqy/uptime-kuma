@@ -1,26 +1,6 @@
 <template>
     <div>
-        <div class="notification-list my-4">
-            <p v-if="$root.notificationList.length === 0">
-                {{ $t("Not available, please setup.") }}
-            </p>
-            <p v-else>
-                {{ $t("notificationDescription") }}
-            </p>
-
-            <ul class="list-group mb-3" style="border-radius: 1rem">
-                <li v-for="(notification, index) in $root.notificationList" :key="index" class="list-group-item">
-                    {{ notification.name }}
-                    <br />
-                    <a href="#" @click="$refs.notificationDialog.show(notification.id)">{{ $t("Edit") }}</a>
-                </li>
-            </ul>
-
-            <button class="btn btn-primary me-2" type="button" @click="$refs.notificationDialog.show()">
-                {{ $t("Setup Notification") }}
-            </button>
-        </div>
-
+        <NotificationChannels embedded />
         <div class="my-4 pt-4">
             <h5 class="my-4 settings-subheading">{{ $t("monitorToastMessagesLabel") }}</h5>
             <p>{{ $t("monitorToastMessagesDescription") }}</p>
@@ -83,6 +63,7 @@
                     :icon="'plus'"
                     :action="() => addTlsExpiryNotifDay(tlsExpiryNotifInput)"
                     :action-aria-label="$t('Add a new expiry notification day')"
+                    :input-aria-label="$t('settingsCertificateExpiry')"
                 />
             </div>
             <div>
@@ -121,6 +102,7 @@
                     :icon="'plus'"
                     :action="() => addDomainExpiryNotifDay(domainExpiryNotifInput)"
                     :action-aria-label="$t('Add a new expiry notification day')"
+                    :input-aria-label="$t('settingsDomainExpiry')"
                 />
             </div>
             <div>
@@ -129,18 +111,16 @@
                 </button>
             </div>
         </div>
-
-        <NotificationDialog ref="notificationDialog" />
     </div>
 </template>
 
 <script>
-import NotificationDialog from "../../components/NotificationDialog.vue";
+import NotificationChannels from "../NotificationChannels.vue";
 import ActionInput from "../ActionInput.vue";
 
 export default {
     components: {
-        NotificationDialog,
+        NotificationChannels,
         ActionInput,
     },
 
@@ -281,13 +261,6 @@ export default {
 .btn-rm-expiry {
     padding-left: 11px;
     padding-right: 11px;
-}
-
-.dark {
-    .list-group-item {
-        background-color: $dark-bg2;
-        color: $dark-font-color;
-    }
 }
 
 .cert-exp-days .cert-exp-day-row {

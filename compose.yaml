@@ -1,9 +1,12 @@
 services:
   uptime-kuma:
-    image: louislam/uptime-kuma:2
+    image: ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.2
+    pull_policy: never
     restart: unless-stopped
     volumes:
-      - ./data:/app/data
+      - preview-data:/app/data
     ports:
-      # <Host Port>:<Container Port>
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
+
+volumes:
+  preview-data:

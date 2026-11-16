@@ -1,9 +1,10 @@
 ARG BASE_IMAGE=uptime-kuma-base24:local
+ARG NODE_VERSION=24.22.3
 
 ############################################
 # Build the healthcheck from source with the current Go toolchain.
 ############################################
-FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm AS build_healthcheck
+FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm AS build_healthcheck
 WORKDIR /app
 ARG TARGETOS
 ARG TARGETARCH
@@ -15,9 +16,10 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
 ############################################
 # Build in Node.js
 ############################################
-FROM node:24.22.3-bookworm-slim AS build
+FROM node:${NODE_VERSION}-bookworm-slim AS build
 RUN apt-get update && apt-get install --yes --no-install-recommends python3 make g++ && \
     rm -rf /var/lib/apt/lists/* && mkdir /app && chown node:node /app
+RUN npm install --global --ignore-scripts --no-fund --no-audit --min-release-age=14 npm@12.2.1
 USER node
 WORKDIR /app
 
@@ -34,6 +36,8 @@ RUN mkdir ./data
 # ⭐ Main Image
 ############################################
 FROM $BASE_IMAGE AS release
+ARG NODE_VERSION
+RUN test "$(node -p process.versions.node)" = "$NODE_VERSION"
 WORKDIR /app
 
 LABEL org.opencontainers.image.source="https://github.com/ub3dqy/uptime-kuma"
@@ -54,9 +58,7 @@ CMD ["node", "server/server.js"]
 FROM release AS rootless
 USER node
 
-############################################
 # Public preview
-############################################
 FROM rootless AS preview
 ENV UPTIME_KUMA_DISABLE_JSONATA=1
 

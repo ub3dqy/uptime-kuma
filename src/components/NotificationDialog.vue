@@ -1,6 +1,6 @@
 <template>
     <form @submit.prevent="submit">
-        <div ref="modal" class="modal fade" tabindex="-1" data-bs-backdrop="static">
+        <div ref="modal" class="modal fade notification-modal" tabindex="-1" data-bs-backdrop="static">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -426,15 +426,20 @@ export default {
         /**
          * Show settings for specified notification
          * @param {number} notificationID ID of notification to show
+         * @param {string} initialType Optional preferred channel for a new notification
          * @returns {void}
          */
-        show(notificationID) {
+        show(notificationID, initialType = "telegram") {
             if (notificationID) {
                 this.id = notificationID;
 
                 for (let n of this.$root.notificationList) {
                     if (n.id === notificationID) {
                         this.notification = JSON.parse(n.config);
+                        if (this.notification.managedDelivery) {
+                            this.$router.push({ path: "/notifications", query: { channel: String(notificationID) } });
+                            return;
+                        }
 
                         // applyExisting is one time only, but it got saved to database previously. Workaround fix, set it to false here to deal with the problem.
                         this.notification.applyExisting = false;
@@ -446,7 +451,7 @@ export default {
                 this.id = null;
                 this.notification = {
                     name: "",
-                    type: "telegram",
+                    type: ["smtp", "telegram"].includes(initialType) ? initialType : "telegram",
                     isDefault: false,
                 };
             }
@@ -536,14 +541,3 @@ export default {
     },
 };
 </script>
-
-<style lang="scss" scoped>
-@import "../assets/vars.scss";
-
-.dark {
-    .modal-dialog .form-text,
-    .modal-dialog p {
-        color: $dark-font-color;
-    }
-}
-</style>

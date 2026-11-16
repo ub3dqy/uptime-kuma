@@ -3,7 +3,7 @@ const { log } = require("../../src/util");
 const { R } = require("redbean-node");
 const { nanoid } = require("nanoid");
 const passwordHash = require("../password-hash");
-const apicache = require("../modules/apicache");
+const responseCache = require("../utils/response-cache");
 const APIKey = require("../model/api_key");
 const { Settings } = require("../settings");
 const { sendAPIKeyList } = require("../client");
@@ -75,7 +75,7 @@ module.exports.apiKeySocketHandler = (socket) => {
 
             await R.exec("DELETE FROM api_key WHERE id = ? AND user_id = ? ", [keyID, socket.userID]);
 
-            apicache.clear();
+            responseCache.clear();
 
             callback({
                 ok: true,
@@ -100,7 +100,7 @@ module.exports.apiKeySocketHandler = (socket) => {
 
             await R.exec("UPDATE api_key SET active = 0 WHERE id = ? ", [keyID]);
 
-            apicache.clear();
+            responseCache.clear();
 
             callback({
                 ok: true,
@@ -125,7 +125,7 @@ module.exports.apiKeySocketHandler = (socket) => {
 
             await R.exec("UPDATE api_key SET active = 1 WHERE id = ? ", [keyID]);
 
-            apicache.clear();
+            responseCache.clear();
 
             callback({
                 ok: true,

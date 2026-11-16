@@ -1,7 +1,7 @@
 ############################################
 # Build the healthcheck from source with the current Go toolchain.
 ############################################
-FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm
+FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm
 WORKDIR /app
 ARG TARGETOS
 ARG TARGETARCH

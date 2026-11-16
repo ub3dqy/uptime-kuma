@@ -1,48 +1,41 @@
 <template>
     <transition name="slide-fade" appear>
-        <div>
-            <h1 class="mb-3">
-                {{ $t("Status Pages") }}
-            </h1>
-
-            <div>
-                <router-link to="/add-status-page" class="btn btn-primary mb-3">
-                    <font-awesome-icon icon="plus" />
+        <div class="status-page-list">
+            <header class="status-list-heading mb-3">
+                <h1>{{ $t("Status Pages") }}</h1>
+                <router-link to="/add-status-page" class="ws-button ws-button-primary">
+                    <font-awesome-icon icon="plus" aria-hidden="true" />
                     {{ $t("New Status Page") }}
                 </router-link>
-            </div>
+            </header>
 
             <div class="shadow-box">
                 <template v-if="$root.statusPageListLoaded">
-                    <span
+                    <p
                         v-if="Object.keys($root.statusPageList).length === 0"
                         class="d-flex align-items-center justify-content-center my-3"
                     >
                         {{ $t("No status pages") }}
-                    </span>
+                    </p>
 
-                    <!-- use <a> instead of <router-link>, because the heartbeat won't load. -->
-                    <a
-                        v-for="statusPage in $root.statusPageList"
-                        :key="statusPage.slug"
-                        :href="'/status/' + statusPage.slug"
-                        class="item"
-                    >
-                        <img :src="icon(statusPage.icon)" alt class="logo me-2" />
-                        <div class="info">
-                            <div class="title">{{ statusPage.title }}</div>
-                            <div class="slug">/status/{{ statusPage.slug }}</div>
-                        </div>
-                        <div class="actions">
-                            <button
-                                class="btn btn-danger delete-status-page"
-                                @click.stop.prevent="deleteDialog(statusPage.slug)"
-                            >
-                                <font-awesome-icon icon="trash" />
-                                <span>{{ $t("Delete") }}</span>
-                            </button>
-                        </div>
-                    </a>
+                    <div v-for="statusPage in $root.statusPageList" :key="statusPage.slug" class="item">
+                        <!-- Reload to initialize the public heartbeat feed. -->
+                        <a :href="'/status/' + statusPage.slug" class="status-page-link">
+                            <img :src="icon(statusPage.icon)" alt="" width="42" height="42" class="logo" />
+                            <div class="info">
+                                <div class="title">{{ statusPage.title }}</div>
+                                <div class="slug">/status/{{ statusPage.slug }}</div>
+                            </div>
+                        </a>
+                        <button
+                            type="button"
+                            class="ws-button ws-button-quiet delete-status-page"
+                            :aria-label="$t('workspaceDeleteStatusPage', { name: statusPage.title })"
+                            @click="deleteDialog(statusPage.slug)"
+                        >
+                            <font-awesome-icon icon="trash" aria-hidden="true" />
+                        </button>
+                    </div>
                 </template>
                 <div v-else class="d-flex align-items-center justify-content-center my-3 spinner">
                     <font-awesome-icon icon="spinner" size="2x" spin />
@@ -74,8 +67,6 @@ export default {
             selectedStatusSlug: "",
         };
     },
-    computed: {},
-    mounted() {},
     methods: {
         /**
          * Get the correct URL for the icon
@@ -108,91 +99,71 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../assets/vars.scss";
-
-.item {
+.status-list-heading {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.status-list-heading h1 {
+    margin: 0;
+}
+
+.status-page-list .shadow-box {
+    border: 1px solid var(--ws-border);
+    background: var(--ws-surface);
+    box-shadow: var(--ws-shadow);
+}
+
+.item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding-block: 8px;
+}
+
+.item + .item {
+    border-top: 1px solid var(--ws-border);
+}
+
+.status-page-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 8px;
+    border-radius: 8px;
     text-decoration: none;
-    border-radius: 10px;
-    transition: all ease-in-out 0.15s;
-    padding: 10px;
-
-    &:hover {
-        background-color: $highlight-white;
-
-        & .actions {
-            visibility: visible;
-        }
-    }
-
-    &.active {
-        background-color: #cdf8f4;
-    }
-
-    $logo-width: 70px;
-
-    .logo {
-        width: $logo-width;
-        height: $logo-width;
-
-        // Better when the image is loading
-        min-height: 1px;
-    }
-
-    .info {
-        flex: 1 1 auto;
-
-        .title {
-            font-weight: bold;
-            font-size: 20px;
-        }
-
-        .slug {
-            font-size: 14px;
-        }
-    }
-
-    .actions {
-        visibility: hidden;
-        display: flex;
-        align-items: center;
-
-        .delete-status-page {
-            flex: 1 1 auto;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-    }
+    color: var(--ws-ink);
+    overflow-wrap: anywhere;
 }
 
-.dark {
-    .item {
-        &:hover {
-            background-color: $dark-bg2;
-        }
-
-        &.active {
-            background-color: $dark-bg2;
-        }
-    }
+.status-page-link:hover {
+    color: var(--ws-action);
+    background: var(--ws-action-soft);
 }
 
-@media (max-width: 770px) {
-    .item {
-        .actions {
-            visibility: visible;
+.logo {
+    flex: 0 0 auto;
+    border-radius: 8px;
+    object-fit: contain;
+}
 
-            .btn {
-                padding: 10px;
-            }
+.title {
+    font-weight: 680;
+}
 
-            span {
-                display: none;
-            }
-        }
-    }
+.slug {
+    color: var(--ws-muted);
+    font-size: 13px;
+}
+
+.delete-status-page {
+    min-width: 45px;
+    padding-inline: 10px;
+    color: var(--ws-danger);
 }
 </style>

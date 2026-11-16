@@ -1,38 +1,40 @@
 const { checkLogin } = require("../util-server");
 const { UptimeCalculator } = require("../uptime-calculator");
+const { R } = require("redbean-node");
 const { log } = require("../../src/util");
+
+const periods = new Set([3, 6, 24, 168]);
 
 module.exports.chartSocketHandler = (socket) => {
     socket.on("getMonitorChartData", async (monitorID, period, callback) => {
+        if (typeof callback !== "function") return;
+        const userID = socket.userID;
+        const generation = socket.projectGeneration;
         try {
             checkLogin(socket);
 
-            log.debug("monitor", `Get Monitor Chart Data: ${monitorID} User ID: ${socket.userID}`);
-
-            if (period == null) {
-                throw new Error("Invalid period.");
+            // The previous dashboard sends the stored selection as a string.
+            const hours = typeof period === "string" && /^(3|6|24|168)$/.test(period) ? Number(period) : period;
+            if (!Number.isSafeInteger(monitorID) || monitorID < 1 || !periods.has(hours)) {
+                return callback({ ok: false, msg: "Invalid chart request." });
             }
 
-            let uptimeCalculator = await UptimeCalculator.getUptimeCalculator(monitorID);
-
-            let data;
-            if (period <= 24) {
-                data = uptimeCalculator.getDataArray(period * 60, "minute");
-            } else if (period <= 720) {
-                data = uptimeCalculator.getDataArray(period, "hour");
-            } else {
-                data = uptimeCalculator.getDataArray(period / 24, "day");
+            const monitor = await R.findOne("monitor", "id = ? AND user_id = ?", [monitorID, userID]);
+            const sameSession = () =>
+                socket.userID === userID && socket.projectGeneration === generation && !socket.disconnected;
+            if (!monitor || monitor.type === "group" || !sameSession()) {
+                return callback({ ok: false, msg: "Monitor not found." });
             }
-
-            callback({
-                ok: true,
-                data,
-            });
+            const calculator = await UptimeCalculator.getUptimeCalculator(monitorID);
+            if (!sameSession()) {
+                return callback({ ok: false, msg: "Monitor not found." });
+            }
+            const data =
+                hours <= 24 ? calculator.getDataArray(hours * 60, "minute") : calculator.getDataArray(hours, "hour");
+            callback({ ok: true, data });
         } catch (e) {
-            callback({
-                ok: false,
-                msg: e.message,
-            });
+            if (userID) log.error("monitor-chart", e);
+            callback({ ok: false, msg: "Could not load chart data." });
         }
     });
 };

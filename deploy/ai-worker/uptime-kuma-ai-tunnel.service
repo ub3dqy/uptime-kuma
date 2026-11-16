@@ -1,0 +1,36 @@
+[Unit]
+Description=Private connection to the owned Uptime Kuma AI service
+Wants=network-online.target
+After=network-online.target docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=kuma-ai-tunnel
+Group=kuma-ai-tunnel
+ExecStart=/usr/bin/ssh -F /var/lib/uptime-kuma-ai-tunnel/ssh_config -N -T kuma-ai-peer
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=15
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+CPUQuota=5%
+MemoryMax=64M
+TasksMax=16
+LimitNOFILE=256
+
+[Install]
+WantedBy=multi-user.target

@@ -1,66 +1,73 @@
 <template>
-    <div class="form-container">
-        <div class="form">
-            <form aria-label="Login Form" class="pt-3" @submit.prevent="submit">
+    <div :class="{ 'ws-access': !embedded }">
+        <div :class="{ 'ws-access-panel': !embedded }">
+            <header class="ws-access-heading">
+                <component :is="embedded ? 'h2' : 'h1'" :id="headingId">{{ $t("Login") }}</component>
+            </header>
+            <form :aria-labelledby="headingId" :aria-busy="processing" @submit.prevent="submit">
                 <div v-if="!tokenRequired" class="form-floating">
                     <input
-                        id="floatingInput"
+                        :id="headingId + '-username'"
                         v-model="username"
                         type="text"
+                        name="username"
                         class="form-control"
-                        placeholder="Username"
+                        :placeholder="$t('Username')"
                         autocomplete="username"
                         required
                     />
-                    <label for="floatingInput">{{ $t("Username") }}</label>
+                    <label :for="headingId + '-username'">{{ $t("Username") }}</label>
                 </div>
 
                 <div v-if="!tokenRequired" class="form-floating mt-3">
                     <input
-                        id="floatingPassword"
+                        :id="headingId + '-password'"
                         v-model="password"
                         type="password"
+                        name="password"
                         class="form-control"
-                        placeholder="Password"
+                        :placeholder="$t('Password')"
                         autocomplete="current-password"
                         required
                     />
-                    <label for="floatingPassword">{{ $t("Password") }}</label>
+                    <label :for="headingId + '-password'">{{ $t("Password") }}</label>
                 </div>
 
                 <div v-if="tokenRequired">
                     <div class="form-floating mt-3">
                         <input
-                            id="otp"
+                            :id="headingId + '-otp'"
                             ref="otpInput"
                             v-model="token"
                             type="text"
                             maxlength="6"
+                            inputmode="numeric"
+                            name="otp"
                             class="form-control"
                             placeholder="123456"
                             autocomplete="one-time-code"
                             required
                         />
-                        <label for="otp">{{ $t("Token") }}</label>
+                        <label :for="headingId + '-otp'">{{ $t("Token") }}</label>
                     </div>
                 </div>
 
-                <div class="form-check mb-3 mt-3 d-flex justify-content-center pe-4">
-                    <div class="form-check">
-                        <input
-                            id="remember"
-                            v-model="$root.remember"
-                            type="checkbox"
-                            value="remember-me"
-                            class="form-check-input"
-                        />
-
-                        <label class="form-check-label" for="remember">
-                            {{ $t("Remember me") }}
-                        </label>
-                    </div>
+                <div class="form-check my-3">
+                    <input
+                        :id="headingId + '-remember'"
+                        v-model="$root.remember"
+                        type="checkbox"
+                        class="form-check-input"
+                    />
+                    <label class="form-check-label" :for="headingId + '-remember'">
+                        {{ $t("Remember me") }}
+                    </label>
                 </div>
-                <button class="w-100 btn btn-primary" type="submit" :disabled="processing">
+                <button
+                    class="w-100 ws-button ws-button-primary justify-content-center"
+                    type="submit"
+                    :disabled="processing"
+                >
                     {{ $t("Login") }}
                 </button>
 
@@ -73,7 +80,15 @@
 </template>
 
 <script>
+import { useId } from "vue";
+
 export default {
+    props: {
+        embedded: { type: Boolean, default: false },
+    },
+    setup() {
+        return { headingId: useId() + "-login" };
+    },
     data() {
         return {
             processing: false,
@@ -95,14 +110,6 @@ export default {
         },
     },
 
-    mounted() {
-        document.title += " - Login";
-    },
-
-    unmounted() {
-        document.title = document.title.replace(" - Login", "");
-    },
-
     methods: {
         /**
          * Submit the user details and attempt to log in
@@ -110,6 +117,7 @@ export default {
          */
         submit() {
             this.processing = true;
+            this.res = null;
 
             this.$root.login(this.username, this.password, this.token, (res) => {
                 this.processing = false;
@@ -124,30 +132,3 @@ export default {
     },
 };
 </script>
-
-<style lang="scss" scoped>
-.form-container {
-    display: flex;
-    align-items: center;
-    padding-top: 40px;
-    padding-bottom: 40px;
-}
-
-.form-floating {
-    > label {
-        padding-left: 1.3rem;
-    }
-
-    > .form-control {
-        padding-left: 1.3rem;
-    }
-}
-
-.form {
-    width: 100%;
-    max-width: 330px;
-    padding: 15px;
-    margin: auto;
-    text-align: center;
-}
-</style>

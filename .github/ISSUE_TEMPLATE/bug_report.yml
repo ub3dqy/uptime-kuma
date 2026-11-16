@@ -15,7 +15,7 @@ body:
     attributes:
       label: "Version and setup / Версия и установка"
       description: "Include the Kuma version, operating system, and how you installed it / Укажите версию Kuma, систему и способ установки"
-      placeholder: "2.5.8-ub3dqy.preview.1, Docker, Linux x86-64"
+      placeholder: "2.5.8-ub3dqy.preview.2, Docker, Linux x86-64"
     validations:
       required: true
   - type: textarea

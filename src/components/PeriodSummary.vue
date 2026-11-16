@@ -1,7 +1,11 @@
 <template>
     <div class="mt-4" data-testid="period-summary" aria-labelledby="period-summary-title" aria-live="polite">
         <h3 id="period-summary-title" class="h5">{{ $t("periodSummaryTitle") }}</h3>
-        <p class="small text-secondary period-range">{{ summary.start }} — {{ summary.end }}</p>
+        <p v-if="showRange" class="small period-range">
+            <time :datetime="summary.start">{{ utcDate(summary.start) }}</time>
+            —
+            <time :datetime="summary.end">{{ utcDate(summary.end) }}</time>
+        </p>
         <p class="small">{{ $t("periodSummaryMethod") }}</p>
         <div class="row gx-0 gy-3 mb-3">
             <div class="col-12 col-sm-6">
@@ -13,8 +17,8 @@
                 <strong class="fs-4" data-testid="summary-coverage">{{ percent(summary.coverage) }}</strong>
             </div>
         </div>
-        <p class="small text-secondary">{{ $t("periodSummaryDenominator") }}</p>
-        <p class="small text-secondary">{{ $t("periodSummaryRetention") }}</p>
+        <p class="small period-note">{{ $t("periodSummaryDenominator") }}</p>
+        <p class="small period-note">{{ $t("periodSummaryRetention") }}</p>
         <p>{{ $t("periodSummaryCheckCount", { total: summary.counts.total, unknown: summary.counts.unknown }) }}</p>
         <p v-if="summary.counts.total === 0" role="status">{{ $t("periodSummaryEmpty") }}</p>
         <p v-if="summary.legacyChecks > 0" class="small" role="status">{{ $t("periodSummaryLegacy") }}</p>
@@ -68,6 +72,7 @@ export default {
     props: {
         summary: { type: Object, required: true },
         showResponse: { type: Boolean, default: true },
+        showRange: { type: Boolean, default: true },
         totalLabel: { type: String, default: "periodSummaryTotal" },
     },
     data() {
@@ -80,7 +85,16 @@ export default {
 </script>
 
 <style scoped>
-.period-range {
+.period-range,
+.period-note {
+    color: var(--ws-muted);
     overflow-wrap: anywhere;
+}
+
+@media print {
+    .period-range,
+    .period-note {
+        color: black;
+    }
 }
 </style>

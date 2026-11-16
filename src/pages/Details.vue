@@ -1,6 +1,6 @@
 <template>
     <transition name="slide-fade" appear>
-        <div v-if="monitor">
+        <div v-if="monitor" class="workspace-service-details">
             <router-link v-if="group !== ''" :to="monitorURL(monitor.parent)">
                 {{ group }}
             </router-link>
@@ -11,6 +11,17 @@
                     <div>{{ monitor.id }}</div>
                 </div>
             </h1>
+            <IncidentCard
+                v-if="monitor.type !== 'group'"
+                :monitor="monitor"
+                :tls-info="tlsInfo"
+                :domain-info="domainInfo"
+            />
+            <MonitorVerification
+                v-if="monitor.witnessSite || monitor.browserSteps?.length"
+                :key="monitor.id"
+                :monitor-id="monitor.id"
+            />
             <!-- eslint-disable-next-line vue/no-v-html-->
             <p v-if="monitor.description" v-html="descriptionHTML"></p>
             <div class="d-flex">
@@ -34,17 +45,22 @@
                         monitor.type === 'real-browser' ||
                         monitor.type === 'websocket-upgrade'
                     "
-                    :href="monitor.url"
+                    :href="publicURL || undefined"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
-                    {{ filterPassword(monitor.url) }}
+                    {{ publicURL || $t("workspacePrivateService") }}
                 </a>
                 <span v-if="monitor.type === 'port'">TCP Port {{ monitor.hostname }}:{{ monitor.port }}</span>
                 <span v-if="monitor.type === 'ping'">Ping: {{ monitor.hostname }}</span>
                 <span v-if="monitor.type === 'globalping'">
-                    <a v-if="monitor.subtype === 'http'" :href="monitor.url" target="_blank" rel="noopener noreferrer">
-                        {{ filterPassword(monitor.url) }}
+                    <a
+                        v-if="monitor.subtype === 'http'"
+                        :href="publicURL || undefined"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {{ publicURL || $t("workspacePrivateService") }}
                     </a>
                     <span v-if="monitor.hostname">{{ monitor.hostname }}</span>
                     <br />
@@ -214,9 +230,7 @@
                         <h4 class="col-4 col-sm-12">{{ pingTitle() }}</h4>
                         <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("Current") }})</p>
                         <span class="col-4 col-sm-12 num">
-                            <a href="#" @click.prevent="showPingChartBox = !showPingChartBox">
-                                <CountUp :value="ping" />
-                            </a>
+                            <CountUp :value="ping" />
                         </span>
                     </div>
                     <div
@@ -302,19 +316,15 @@
             </transition>
 
             <!-- Ping Chart -->
-            <div v-if="showPingChartBox" class="shadow-box big-padding text-center ping-chart-wrapper">
-                <div class="row">
-                    <div class="col">
-                        <PingChart :monitor-id="monitor.id" />
-                    </div>
-                </div>
+            <div v-if="monitor.type !== 'group'" class="shadow-box big-padding ping-chart-wrapper">
+                <PingChart :key="monitor.id" :monitor-id="monitor.id" />
             </div>
 
             <!-- Retained history export -->
             <HeartbeatExport v-if="monitor.type !== 'group'" :key="monitor.id" :monitor-id="monitor.id" />
 
             <!-- Screenshot -->
-            <div v-if="monitor.type === 'real-browser'" class="shadow-box">
+            <div v-if="monitor.type === 'real-browser' && monitor.screenshot" class="shadow-box">
                 <div class="row">
                     <div class="col-md-6 zoom-cursor">
                         <img
@@ -351,7 +361,7 @@
                         </li>
                     </ul>
                 </div>
-                <table class="table table-borderless table-hover">
+                <table class="table table-borderless table-hover monitor-events">
                     <thead>
                         <tr>
                             <th>{{ $t("Status") }}</th>
@@ -440,6 +450,9 @@
 </template>
 
 <script>
+import { currentServiceState } from "../overview-state.ts";
+import IncidentCard from "../components/IncidentCard.vue";
+import MonitorVerification from "../components/MonitorVerification.vue";
 import { defineAsyncComponent } from "vue";
 import { useToast } from "../notifications";
 const toast = useToast();
@@ -463,6 +476,8 @@ import HeartbeatExport from "../components/HeartbeatExport.vue";
 
 export default {
     components: {
+        IncidentCard,
+        MonitorVerification,
         Uptime,
         CountUp,
         Datetime,
@@ -483,12 +498,13 @@ export default {
             perPage: 25,
             heartBeatList: [],
             toggleCertInfoBox: false,
-            showPingChartBox: true,
             paginationConfig: {
                 hideCount: true,
                 chunksNavigation: "scroll",
             },
             cacheTime: Date.now(),
+            stateNow: Date.now(),
+            stateClock: null,
             importantHeartBeatListLength: 0,
             displayedRecords: [],
             pushMonitor: {
@@ -500,6 +516,14 @@ export default {
         };
     },
     computed: {
+        publicURL() {
+            try {
+                const url = new URL(this.monitor?.url);
+                return ["http:", "https:"].includes(url.protocol) ? url.origin : "";
+            } catch {
+                return "";
+            }
+        },
         monitor() {
             let id = this.$route.params.id;
             return this.$root.monitorList[id];
@@ -556,6 +580,31 @@ export default {
         },
 
         status() {
+            if (this.monitor.type !== "group") {
+                const state = currentServiceState(
+                    this.monitor,
+                    this.$root.heartbeatList[this.monitor.id] || [],
+                    this.stateNow,
+                    this.$root.socket.connected
+                ).state;
+                const labels = {
+                    up: "Up",
+                    down: "Down",
+                    pending: "Pending",
+                    unknown: "workspaceStateUnknown",
+                    paused: "workspaceStatePaused",
+                    maintenance: "Maintenance",
+                };
+                const colors = {
+                    up: "primary",
+                    down: "danger",
+                    pending: "warning",
+                    unknown: "secondary",
+                    paused: "secondary",
+                    maintenance: "maintenance",
+                };
+                return { text: this.$t(labels[state]), color: colors[state] };
+            }
             if (this.$root.statusList[this.monitor.id]) {
                 return this.$root.statusList[this.monitor.id];
             }
@@ -622,6 +671,9 @@ export default {
     },
 
     mounted() {
+        this.stateClock = setInterval(() => {
+            this.stateNow = Date.now();
+        }, 10000);
         this.getImportantHeartbeatListLength();
 
         this.$root.emitter.on("newImportantHeartbeat", this.onNewImportantHeartbeat);
@@ -635,20 +687,12 @@ export default {
     },
 
     beforeUnmount() {
+        clearInterval(this.stateClock);
         this.$root.emitter.off("newImportantHeartbeat", this.onNewImportantHeartbeat);
     },
 
     methods: {
         getResBaseURL,
-        /**
-         * Request a test notification be sent for this monitor
-         * @returns {void}
-         */
-        testNotification() {
-            this.$root.getSocket().emit("testNotification", this.monitor.id);
-            this.$root.toastSuccess("Test notification is requested.");
-        },
-
         /**
          * Show dialog to confirm pause
          * @returns {void}
@@ -927,16 +971,27 @@ export default {
     margin-top: 25px;
 }
 
+.ping-chart-wrapper {
+    min-width: 0;
+}
+
 .word {
     color: $secondary-text;
     font-size: 14px;
 }
 
-table {
+.monitor-events {
+    width: 100%;
     font-size: 14px;
 
-    tr {
-        transition: all ease-in-out 0.2ms;
+    td {
+        overflow-wrap: anywhere;
+    }
+}
+
+@media (max-width: 550px) {
+    .monitor-events {
+        table-layout: fixed;
     }
 }
 
