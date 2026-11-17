@@ -137,6 +137,7 @@ const Database = require("./database");
 log.debug("server", "Importing Background Jobs");
 const { initBackgroundJobs, stopBackgroundJobs } = require("./jobs");
 const { loginRateLimiter, twoFaRateLimiter } = require("./rate-limiter");
+const { readOrCreateSetupCode, matchesSetupCode, removeSetupCode } = require("./setup-access");
 
 const { apiAuth } = require("./auth");
 const { login } = require("./auth");
@@ -232,6 +233,8 @@ app.use(function (req, res, next) {
  * @type {boolean}
  */
 let needSetup = false;
+let setupCode;
+let creatingOwner = false;
 
 (async () => {
     // Create a data directory
@@ -241,7 +244,8 @@ let needSetup = false;
     let setupDatabase = new SetupDatabase(args, server);
     if (setupDatabase.isNeedSetup()) {
         // Hold here and start a special setup page until user choose a database type
-        await setupDatabase.start(hostname, port);
+        setupCode = readOrCreateSetupCode(Database.dataDir);
+        await setupDatabase.start(hostname, port, setupCode);
     }
 
     // Connect to database
@@ -389,6 +393,7 @@ let needSetup = false;
     const apiRouter = require("./routers/api-router");
     app.use(apiRouter);
     app.use(require("./routers/project-ai-router"));
+    app.get("/auth/callback", require("./projects/subscription").embeddedCallback);
     app.use(require("./independent-witness").router());
 
     // Status Page Router
@@ -744,40 +749,61 @@ let needSetup = false;
             }
         });
 
-        socket.on("needSetup", async (callback) => {
-            callback(needSetup);
+        socket.on("needSetup", (callback) => {
+            if (typeof callback === "function") {
+                callback(needSetup);
+            }
         });
 
-        socket.on("setup", async (username, password, callback) => {
+        socket.on("setup", async (request, callback) => {
+            if (typeof callback !== "function") {
+                return;
+            }
+            if (!needSetup || creatingOwner) {
+                callback({ ok: false, msg: needSetup ? "setupOwnerBusy" : "setupOwnerExists", msgi18n: true });
+                return;
+            }
+            if (!matchesSetupCode(request?.code, setupCode)) {
+                callback({ ok: false, msg: "setupCodeInvalid", msgi18n: true });
+                return;
+            }
+
+            creatingOwner = true;
             try {
-                if (passwordStrength(password).value === "Too weak") {
-                    throw new TranslatableError("passwordTooWeak");
+                const { username, password } = request;
+                if (typeof username !== "string" || !username.trim() || username.trim().length > 64 ||
+                    /[\u0000-\u001f\u007f]/u.test(username)) {
+                    throw new TranslatableError("setupUsernameInvalid");
+                }
+                if (typeof password !== "string" || Buffer.byteLength(password) > 72 ||
+                    [...password].length < 15 || passwordStrength(password).value === "Too weak") {
+                    throw new TranslatableError("setupPasswordInvalid");
                 }
 
-                if ((await R.knex("user").count("id as count").first()).count !== 0) {
-                    throw new Error(
-                        "Uptime Kuma has been initialized. If you want to run setup again, please delete the database."
-                    );
-                }
-
-                let user = R.dispense("user");
-                user.username = username;
-                user.password = await passwordHash.generate(password);
-                await R.store(user);
-
+                const hash = await passwordHash.generate(password);
+                await R.knex.transaction(async (tx) => {
+                    await tx("setting").where({ key: "jwtSecret" }).forUpdate().first("id");
+                    const { count } = await tx("user").count("id as count").first();
+                    if (Number(count) !== 0) {
+                        throw new TranslatableError("setupOwnerExists");
+                    }
+                    await tx("user").insert({ username: username.trim(), password: hash });
+                });
                 needSetup = false;
-
-                callback({
-                    ok: true,
-                    msg: "successAdded",
-                    msgi18n: true,
-                });
-            } catch (e) {
-                callback({
-                    ok: false,
-                    msg: e.message,
-                    msgi18n: !!e.msgi18n,
-                });
+                setupCode = undefined;
+                try {
+                    removeSetupCode(Database.dataDir);
+                } catch {
+                    log.warn("server", "The used installation code could not be removed from the data directory");
+                }
+                callback({ ok: true, msg: "successAdded", msgi18n: true });
+            } catch (error) {
+                if (!error.msgi18n) {
+                    log.error("server", "The first owner account could not be saved");
+                }
+                callback({ ok: false, msg: error.msgi18n ? error.message : "setupSaveFailed", msgi18n: true });
+            } finally {
+                creatingOwner = false;
             }
         });
 
@@ -1857,10 +1883,15 @@ let needSetup = false;
         periodSummarySocketHandler(socket);
         clientGroupSocketHandler(socket);
         deliverySocketHandler(socket, sendNotificationList);
+        const localOrigin = require("./projects/subscription").embeddedOrigin();
+        const { host: socketHost, origin: socketOrigin } = socket.handshake.headers;
+        const callbackOrigin = localOrigin && socketHost === new URL(localOrigin).host &&
+            (!socketOrigin || socketOrigin === localOrigin) ? localOrigin : null;
         projectSocketHandler(socket, {
-            localSignIn: process.env.UPTIME_KUMA_LOCAL_OAUTH === "1" && hostname === "127.0.0.1",
-            baseURL: async () =>
-                hostname === "127.0.0.1" ? `http://127.0.0.1:${port}` : await Settings.get("primaryBaseURL"),
+            localSignIn: Boolean(callbackOrigin) || (process.env.UPTIME_KUMA_LOCAL_OAUTH === "1" && hostname === "127.0.0.1"),
+            callbackOrigin,
+            baseURL: async () => callbackOrigin ??
+                (hostname === "127.0.0.1" ? "http://127.0.0.1:" + port : await Settings.get("primaryBaseURL")),
             syncMonitor: syncSavedMonitor,
             restartMonitor,
         });
@@ -2041,9 +2072,16 @@ async function initDatabase(testMode = false) {
     }
 
     // If there is no record in user table, it is a new Uptime Kuma instance, need to setup
-    if ((await R.knex("user").count("id as count").first()).count === 0) {
-        log.info("server", "No user, need setup");
+    if (Number((await R.knex("user").count("id as count").first()).count) === 0) {
+        setupCode ??= readOrCreateSetupCode(Database.dataDir);
+        log.info("server", "First launch. Open the installation code from .setup-code in the data directory.");
         needSetup = true;
+    } else {
+        try {
+            removeSetupCode(Database.dataDir);
+        } catch {
+            log.warn("server", "The used installation code could not be removed from the data directory");
+        }
     }
 
     server.jwtSecret = jwtSecretBean.value;

@@ -160,7 +160,7 @@ function createWorker(options) {
             return;
         }
         if (value.action === "health") {
-            reply(response, meta, { ok: true, ready: true });
+            reply(response, meta, { ok: true, ready: true, providers: ["openai", "anthropic"] });
             return;
         }
         if (controllers.size >= 4) {

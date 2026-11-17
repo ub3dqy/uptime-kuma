@@ -1,12 +1,40 @@
 services:
   uptime-kuma:
-    image: ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.2
+    image: ub3dqy/uptime-kuma:local
     pull_policy: never
+    build:
+      context: .
+      dockerfile: docker/start.dockerfile
     restart: unless-stopped
-    volumes:
-      - preview-data:/app/data
+    init: true
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    stop_grace_period: 60s
+    environment:
+      NODE_ENV: production
+      UPTIME_KUMA_HOST: 0.0.0.0
+      UPTIME_KUMA_PORT: "3001"
+      UPTIME_KUMA_DISABLE_JSONATA: "1"
+      UPTIME_KUMA_LOCAL_OAUTH: "1"
+      UPTIME_KUMA_LOCAL_OAUTH_ORIGIN: "http://127.0.0.1:${KUMA_PORT:-3001}"
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:${KUMA_PORT:-3001}:3001"
+    volumes:
+      - "${KUMA_DATA_SOURCE:-./data}:/app/data"
+    tmpfs:
+      - /tmp:size=134217728,mode=1777
+    healthcheck:
+      test: [CMD, node, extra/pilot-healthcheck.cjs]
+      interval: 5s
+      timeout: 4s
+      start_period: 45s
+      retries: 12
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
 
 volumes:
-  preview-data:
+  kuma_data:

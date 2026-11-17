@@ -192,6 +192,25 @@
                     </div>
                 </template>
 
+                <div class="mt-3 text-start">
+                    <label for="database-setup-code" class="form-label">{{ $t("setupCode") }}</label>
+                    <input
+                        id="database-setup-code"
+                        v-model.trim="code"
+                        type="password"
+                        name="setup-code"
+                        autocomplete="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        maxlength="32"
+                        class="form-control"
+                        aria-describedby="database-setup-code-help"
+                        required
+                    />
+                    <small id="database-setup-code-help" class="ws-channel-note">{{ $t("setupCodeHelp") }}</small>
+                </div>
+                <p v-if="error" class="ws-form-error mt-3" role="alert">{{ $t(error) }}</p>
+
                 <button
                     class="w-100 ws-button ws-button-primary justify-content-center mt-4"
                     type="submit"
@@ -206,14 +225,15 @@
 
 <script>
 import axios from "axios";
-import { useToast } from "../notifications";
+import { setupCodeFromLink } from "../setup-link";
 import { sleep } from "../util.ts";
-const toast = useToast();
 
 export default {
     data() {
         return {
             show: false,
+            code: "",
+            error: "",
             dbConfig: {
                 type: undefined,
                 port: 3306,
@@ -221,7 +241,7 @@ export default {
                 username: "",
                 password: "",
                 dbName: "kuma",
-                ssl: false,
+                ssl: true,
                 ca: "",
             },
             info: {
@@ -239,51 +259,60 @@ export default {
             return this.info.isEnabledMariaDBSocket;
         },
     },
+    watch: {
+        "$route.hash": {
+            immediate: true,
+            handler(hash) {
+                const code = setupCodeFromLink(hash);
+                if (this.$route.path === "/setup-database" && code) {
+                    this.code = code;
+                    this.$router.replace({ hash: "" });
+                }
+            },
+        },
+    },
     async mounted() {
-        let res = await axios.get("/setup-database-info");
-        this.info = res.data;
-
-        if (this.info && this.info.needSetup === false) {
-            location.href = "/setup";
-        } else {
-            this.show = true;
+        try {
+            const { data } = await axios.get("/setup-database-info", { timeout: 5000 });
+            this.info = data;
+            if (data.needSetup === false) {
+                this.goToOwner();
+            } else {
+                this.show = true;
+            }
+        } catch {
+            this.$router.replace("/setup");
         }
     },
     methods: {
         async submit() {
             this.info.runningSetup = true;
-
+            this.error = "";
             try {
-                await axios.post("/setup-database", {
-                    dbConfig: this.dbConfig,
-                });
-                await sleep(2000);
-                await this.goToMainServerWhenReady();
-            } catch (e) {
-                toast.error(e.response?.data || e.message);
+                await axios.post("/setup-database", { dbConfig: this.dbConfig, code: this.code }, { timeout: 15000 });
+                for (let attempt = 0; attempt < 25; attempt++) {
+                    await sleep(800);
+                    try {
+                        const { data } = await axios.get("/setup-database-info", { timeout: 1200 });
+                        if (data.needSetup === false) {
+                            this.goToOwner();
+                            return;
+                        }
+                    } catch {
+                        // The main panel is still starting.
+                    }
+                }
+                this.error = "setupSaveFailed";
+            } catch (error) {
+                this.error = error.response?.data?.error || "setupSaveFailed";
             } finally {
                 this.info.runningSetup = false;
             }
         },
 
-        async goToMainServerWhenReady() {
-            try {
-                console.log("Trying...");
-                let res = await axios.get("/setup-database-info");
-                if (res.data && res.data.needSetup === false) {
-                    this.show = false;
-                    location.href = "/setup";
-                } else {
-                    if (res.data) {
-                        this.info = res.data;
-                    }
-                    throw new Error("not ready");
-                }
-            } catch (e) {
-                console.log("Not ready yet");
-                await sleep(2000);
-                await this.goToMainServerWhenReady();
-            }
+        goToOwner() {
+            const fragment = /^[A-Za-z0-9_-]{32}$/.test(this.code) ? "#code=" + this.code : "";
+            window.location.replace("/setup" + fragment);
         },
     },
 };

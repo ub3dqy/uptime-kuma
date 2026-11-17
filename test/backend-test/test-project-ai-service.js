@@ -443,3 +443,33 @@ test("a queued settings save cannot revoke a subscription after its administrato
     assert.equal(after.secret_cipher, secret);
     assert.equal(after.revision, before.revision);
 });
+
+test("changing provider requires its own key, clears the model and withdraws old automatic consent", async (t) => {
+    const { db, projectID } = await fixture(t);
+    transport(t);
+    const current = await configure(projectID);
+    await db("project_ai_automation").insert({
+        project_id: projectID, enabled: 1, revision: 1, updated_at: Date.now(),
+        monitor_ids_json: "[]",
+    });
+    await assert.rejects(
+        ai.saveSettings(1, { ...current, projectID, mode: "anthropic", model: "" }, guard),
+        /projectAIKeyRequired/
+    );
+    const reject = await ai.settings(1, projectID);
+    assert.equal(reject.mode, "api");
+    const finished = await ai.saveSettings(1, {
+        ...current, projectID, mode: "anthropic", model: "",
+        apiKey: "synthetic-anthropic-key-separate", allowNames: true, allowHistory: true,
+    }, guard);
+    assert.equal(finished.settings.mode, "anthropic");
+    assert.equal(finished.settings.model, "");
+    assert.deepEqual(finished.settings.models, []);
+    assert.equal(finished.settings.allowNames, false);
+    assert.equal(finished.settings.allowHistory, false);
+    const cipher = (await db("project_ai").where({ project_id: projectID }).first()).secret_cipher;
+    const grant = getVault().open(projectID, cipher);
+    assert.equal(grant.mode, "anthropic");
+    assert.equal(grant.api_key, "synthetic-anthropic-key-separate");
+    assert.equal((await db("project_ai_automation").where({ project_id: projectID }).first()).enabled, 0);
+});

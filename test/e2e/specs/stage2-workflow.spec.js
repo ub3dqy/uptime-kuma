@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { ProjectVault } from "../../../server/projects/vault.js";
-import { login } from "../util-test";
+import { e2eOwnerPassword, getSetupCode, login } from "../util-test";
 
 let peer;
 let socket;
@@ -85,9 +85,9 @@ test.beforeAll(async ({ baseURL }) => {
         socket.connect();
     });
     if (await socket.timeout(10000).emitWithAck("needSetup")) {
-        await call("setup", "admin", "admin123");
+        await call("setup", { username: "admin", password: e2eOwnerPassword, code: getSetupCode() });
     }
-    await call("login", { username: "admin", password: "admin123", token: "" });
+    await call("login", { username: "admin", password: e2eOwnerPassword, token: "" });
     const ownProject = (await call("projectList", {})).projects.find((project) => project.personal);
     personalProjectID = ownProject.id;
     const ownSnapshot = await call("projectSnapshot", { projectID: ownProject.id });

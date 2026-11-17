@@ -8,6 +8,7 @@ const { allowDevAllOrigin, printServerUrls } = require("./util-server");
 const mysql = require("mysql2/promise");
 const { isSSL, sslKey, sslCert, sslKeyPassphrase } = require("./config");
 const https = require("https");
+const { matchesSetupCode } = require("./setup-access");
 
 /**
  * Reads a configuration value from an environment variable or a Docker secrets file.
@@ -61,53 +62,39 @@ class SetupDatabase {
 
     /**
      * @param  {object} args The arguments passed from the command line
+     * @throws {Error} Saved database settings are invalid
      * @param  {UptimeKumaServer} server the main server instance
      */
     constructor(args, server) {
         this.server = server;
 
-        // Priority: env > db-config.json
-        // If env is provided, write it to db-config.json
-        // If db-config.json is found, check if it is valid
-        // If db-config.json is not found or invalid, check if kuma.db is found
-        // If kuma.db is not found, show setup page
-
-        let dbConfig;
-
-        try {
-            dbConfig = Database.readDBConfig();
-            log.debug("setup-database", "db-config.json is found and is valid");
+        const requestedType = process.env.UPTIME_KUMA_DB_TYPE;
+        if (requestedType) {
+            Database.writeDBConfig({
+                type: requestedType,
+                hostname: process.env.UPTIME_KUMA_DB_HOSTNAME,
+                port: process.env.UPTIME_KUMA_DB_PORT,
+                dbName: process.env.UPTIME_KUMA_DB_NAME,
+                username: getEnvOrFile("UPTIME_KUMA_DB_USERNAME"),
+                password: getEnvOrFile("UPTIME_KUMA_DB_PASSWORD"),
+                socketPath: process.env.UPTIME_KUMA_DB_SOCKET?.trim(),
+                ssl: getEnvOrFile("UPTIME_KUMA_DB_SSL")?.toLowerCase() === "true",
+                ca: getEnvOrFile("UPTIME_KUMA_DB_CA"),
+            });
             this.needSetup = false;
-        } catch (e) {
-            log.info("setup-database", "db-config.json is not found or invalid: " + e.message);
-
-            // Check if kuma.db is found (1.X.X users), generate db-config.json
-            if (fs.existsSync(path.join(Database.dataDir, "kuma.db"))) {
-                this.needSetup = false;
-
-                log.info("setup-database", "kuma.db is found, generate db-config.json");
-                Database.writeDBConfig({
-                    type: "sqlite",
-                });
-            } else {
-                this.needSetup = true;
-            }
-            dbConfig = {};
+            return;
         }
-
-        if (process.env.UPTIME_KUMA_DB_TYPE) {
+        try {
+            Database.readDBConfig();
             this.needSetup = false;
-            log.info("setup-database", "UPTIME_KUMA_DB_TYPE is provided by env, try to override db-config.json");
-            dbConfig.type = process.env.UPTIME_KUMA_DB_TYPE;
-            dbConfig.hostname = process.env.UPTIME_KUMA_DB_HOSTNAME;
-            dbConfig.port = process.env.UPTIME_KUMA_DB_PORT;
-            dbConfig.dbName = process.env.UPTIME_KUMA_DB_NAME;
-            dbConfig.username = getEnvOrFile("UPTIME_KUMA_DB_USERNAME");
-            dbConfig.password = getEnvOrFile("UPTIME_KUMA_DB_PASSWORD");
-            dbConfig.socketPath = process.env.UPTIME_KUMA_DB_SOCKET?.trim();
-            dbConfig.ssl = getEnvOrFile("UPTIME_KUMA_DB_SSL")?.toLowerCase() === "true";
-            dbConfig.ca = getEnvOrFile("UPTIME_KUMA_DB_CA");
-            Database.writeDBConfig(dbConfig);
+        } catch (error) {
+            if (error.code !== "ENOENT") {
+                throw new Error("The saved database settings could not be read. Check db-config.json in the data directory.");
+            }
+            if (fs.existsSync(path.join(Database.dataDir, "kuma.db")) || process.env.UPTIME_KUMA_SETUP_DATABASE !== "1") {
+                Database.writeDBConfig({ type: "sqlite" });
+                this.needSetup = false;
+            }
         }
     }
 
@@ -131,13 +118,14 @@ class SetupDatabase {
      * Start the setup-database server
      * @param {string} hostname where the server is listening
      * @param {number} port where the server is listening
+     * @param {string} setupCode Private installation code
      * @returns {Promise<void>}
      */
-    start(hostname, port) {
+    start(hostname, port, setupCode) {
         return new Promise((resolve) => {
             const app = express();
             let tempServer;
-            app.use(express.json());
+            app.use(express.json({ limit: "32kb" }));
 
             // Disable Keep Alive, otherwise the server will not shutdown, as the client will keep the connection alive
             app.use(function (req, res, next) {
@@ -170,6 +158,11 @@ class SetupDatabase {
             app.post("/setup-database", async (request, response) => {
                 allowDevAllOrigin(response);
 
+                response.setHeader("Cache-Control", "no-store");
+                if (!matchesSetupCode(request.body?.code, setupCode)) {
+                    response.status(403).json({ error: "setupCodeInvalid" });
+                    return;
+                }
                 if (this.runningSetup) {
                     response.status(400).json("Setup is already running");
                     return;
@@ -186,7 +179,7 @@ class SetupDatabase {
                 }
 
                 // Validate input
-                if (typeof dbConfig !== "object") {
+                if (!dbConfig || typeof dbConfig !== "object" || Array.isArray(dbConfig)) {
                     response.status(400).json("Invalid dbConfig");
                     this.runningSetup = false;
                     return;
@@ -246,6 +239,7 @@ class SetupDatabase {
                     try {
                         log.info("setup-database", "Testing database connection...");
                         const connection = await mysql.createConnection({
+                            connectTimeout: 8000,
                             host: dbConfig.hostname,
                             port: dbConfig.port,
                             user: dbConfig.username,
@@ -261,17 +255,25 @@ class SetupDatabase {
                                   }
                                 : {}),
                         });
-                        await connection.execute("SELECT 1");
-                        connection.end();
-                    } catch (e) {
-                        response.status(400).json("Cannot connect to the database: " + e.message);
+                        try {
+                            await connection.query({ sql: "SELECT 1", timeout: 5000 });
+                        } finally {
+                            connection.destroy();
+                        }
+                    } catch {
+                        response.status(400).json({ error: "setupDatabaseUnavailable" });
                         this.runningSetup = false;
                         return;
                     }
                 }
 
-                // Write db-config.json
-                Database.writeDBConfig(dbConfig);
+                try {
+                    Database.writeDBConfig(dbConfig);
+                } catch {
+                    response.status(500).json({ error: "setupSaveFailed" });
+                    this.runningSetup = false;
+                    return;
+                }
 
                 response.json({
                     ok: true,

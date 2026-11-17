@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { login } from "../util-test";
+import { e2eOwnerPassword, getSetupCode, login } from "../util-test";
 
 test("explicit work, its local email notices, responsive card and real post-update failure/recovery", async ({
     page,
@@ -51,8 +51,8 @@ test("explicit work, its local email notices, responsive card and real post-upda
         fs.renameSync(feed + ".next", feed);
     };
     try {
-        if (await socket.timeout(10000).emitWithAck("needSetup")) await call("setup", "admin", "admin123");
-        await call("login", { username: "admin", password: "admin123", token: "" });
+        if (await socket.timeout(10000).emitWithAck("needSetup")) await call("setup", { username: "admin", password: e2eOwnerPassword, code: getSetupCode() });
+        await call("login", { username: "admin", password: e2eOwnerPassword, token: "" });
         const project = (await call("projectList", {})).projects.find((item) => item.personal);
         const snapshot = await call("projectSnapshot", { projectID: project.id });
         await call("projectUpdate", {

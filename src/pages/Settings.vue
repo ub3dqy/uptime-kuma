@@ -25,6 +25,9 @@
 
         <div class="settings-layout" :class="{ 'with-menu': showSubMenu }">
             <nav v-if="showSubMenu" class="settings-menu" :aria-label="$t('Settings')">
+                <router-link v-if="$root.projectAccess.installationAdmin" to="/start">
+                    <div class="menu-item">{{ $t("startTitle") }}</div>
+                </router-link>
                 <router-link v-for="(item, key) in subMenus" :key="key" :to="`/settings/${key}`">
                     <div class="menu-item">
                         {{ item.title }}

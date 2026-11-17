@@ -6,7 +6,7 @@ const REQUEST_LIMIT = 262144;
 const RESPONSE_LIMIT = 4194304;
 const PROVIDER_LIMIT = 2097152;
 const BODY_LIMIT = 131072;
-const headerNames = ["authorization", "content-type", "accept", "openai-beta", "openai-organization", "openai-project"];
+const headerNames = ["authorization", "content-type", "accept", "openai-beta", "openai-organization", "openai-project", "x-api-key", "anthropic-version"];
 
 /**
  * @returns {Error} A credential-free transport failure.
@@ -280,11 +280,17 @@ function validateRequest(value) {
     )
         throw failure();
     const url = new URL(value.url);
+    const anthropic = url.origin === "https://api.anthropic.com";
     if (
-        !["https://auth.openai.com", "https://api.openai.com"].includes(url.origin) ||
+        !["https://auth.openai.com", "https://api.openai.com", "https://api.anthropic.com"].includes(url.origin) ||
         url.username ||
         url.password ||
         url.hash ||
+        (anthropic && !(
+            (value.method === "GET" && url.pathname === "/v1/models" &&
+                /^\?limit=100(?:&after_id=claude-[a-z0-9._-]{2,121})?$/.test(url.search)) ||
+            (value.method === "POST" && url.pathname === "/v1/messages" && !url.search)
+        )) ||
         (url.origin === "https://api.openai.com" &&
             !url.pathname.startsWith("/v1/") &&
             !url.pathname.startsWith("/.well-known/"))
@@ -297,6 +303,10 @@ function validateRequest(value) {
         Object.entries(value.headers).some(
             ([name, text]) => !headerNames.includes(name) || typeof text !== "string" || /[\r\n\0]/.test(text)
         ) ||
+        (anthropic ?
+            (!value.headers["x-api-key"] || value.headers["anthropic-version"] !== "2026-10-21" ||
+                Object.keys(value.headers).some((key) => !["x-api-key", "anthropic-version", "accept", "content-type"].includes(key))) :
+            ("x-api-key" in value.headers || "anthropic-version" in value.headers)) ||
         Buffer.byteLength(JSON.stringify(value.headers)) > 16384 ||
         (value.body !== null && (typeof value.body !== "string" || Buffer.byteLength(value.body) > BODY_LIMIT)) ||
         (value.method === "GET" && value.body !== null)

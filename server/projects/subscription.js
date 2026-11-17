@@ -5,6 +5,7 @@ const { permit, id, problem, audit } = require("./access");
 const { getVault } = require("./vault");
 const ai = require("./ai-service");
 const listeners = new Map();
+const embeddedCallbacks = new Map();
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
 /**
@@ -195,9 +196,10 @@ async function complete(pairingID, token, response) {
  * @param {object} request Project/config
  * @param {Function} guard Guard
  * @param {string} base App origin
+ * @param {string|null} callbackOrigin Explicit loopback origin published by local Docker
  * @returns {Promise<object>} Authorization URL, never tokens
  */
-async function beginLocal(userID, request, guard, base) {
+async function beginLocal(userID, request, guard, base, callbackOrigin = null) {
     if (process.env.UPTIME_KUMA_LOCAL_OAUTH !== "1") {
         throw problem("projectSignInNeedsHelper");
     }
@@ -208,15 +210,25 @@ async function beginLocal(userID, request, guard, base) {
     let timer;
     let busy = false;
     let redirectURI;
-    const listener = http.createServer(async (incoming, outgoing) => {
+    let listener;
+    const handle = {
+        close() {
+            clearTimeout(timer);
+            listener?.close();
+            embeddedCallbacks.delete(state);
+            if (listeners.get(request.projectID) === handle) {
+                listeners.delete(request.projectID);
+            }
+        },
+    };
+    const accept = async (incoming, outgoing) => {
         outgoing.setHeader("Cache-Control", "no-store");
         outgoing.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
         outgoing.setHeader("Referrer-Policy", "no-referrer");
         outgoing.setHeader("Content-Type", "text/plain; charset=utf-8");
-        const address = listener.address();
         if (
             incoming.method !== "GET" ||
-            incoming.headers.host !== `127.0.0.1:${address?.port}` ||
+            incoming.headers.host !== new URL(redirectURI).host ||
             incoming.url.length > 10000
         ) {
             outgoing.writeHead(400).end("Invalid callback");
@@ -276,24 +288,25 @@ async function beginLocal(userID, request, guard, base) {
                     "Вход не подтверждён. Проверьте разрешение Uptime Kuma в настройках ChatGPT, затем начните заново. Пароли и токены здесь не показываются."
                 );
         } finally {
-            clearTimeout(timer);
-            listener.close();
-            listeners.delete(request.projectID);
+            handle.close();
         }
-    });
-    listener.headersTimeout = 10000;
-    listener.requestTimeout = 15000;
-    await new Promise((resolve, reject) => {
-        listener.once("error", reject);
-        listener.listen(0, "127.0.0.1", resolve);
-    });
-    redirectURI = `http://127.0.0.1:${listener.address().port}/auth/callback`;
-    timer = setTimeout(() => {
-        listener.close();
-        listeners.delete(request.projectID);
-    }, 600000);
+    };
+    if (callbackOrigin) {
+        redirectURI = callbackOrigin + "/auth/callback";
+        embeddedCallbacks.set(state, accept);
+    } else {
+        listener = http.createServer(accept);
+        listener.headersTimeout = 10000;
+        listener.requestTimeout = 15000;
+        await new Promise((resolve, reject) => {
+            listener.once("error", reject);
+            listener.listen(0, "127.0.0.1", resolve);
+        });
+        redirectURI = "http://127.0.0.1:" + listener.address().port + "/auth/callback";
+    }
+    timer = setTimeout(handle.close, 600000);
     timer.unref();
-    listeners.set(request.projectID, listener);
+    listeners.set(request.projectID, handle);
     return {
         authorizationURL: ai.client().authorizeURL({
             hostID: config.hostID,
@@ -307,6 +320,45 @@ async function beginLocal(userID, request, guard, base) {
     };
 }
 
+/** @returns {string|null} Explicit browser origin for the local Docker profile. */
+function embeddedOrigin() {
+    const candidate = process.env.UPTIME_KUMA_LOCAL_OAUTH_ORIGIN || "";
+    if (process.env.UPTIME_KUMA_LOCAL_OAUTH !== "1" || !/^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/.test(candidate)) {
+        return null;
+    }
+    try {
+        return new URL(candidate).origin === candidate ? candidate : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {object} request Local browser callback
+ * @param {object} response Non-cacheable status for this one sign-in
+ * @returns {Promise<void>|void} Bounded callback result
+ */
+function embeddedCallback(request, response) {
+    response.setHeader("Cache-Control", "no-store");
+    response.setHeader("Referrer-Policy", "no-referrer");
+    const origin = embeddedOrigin();
+    if (!origin || request.method !== "GET" || request.headers.host !== new URL(origin).host ||
+        request.url.length > 10000) {
+        response.statusCode = 404;
+        response.end("Not found");
+        return;
+    }
+    const callback = new URL(request.url, origin);
+    const state = callback.searchParams.get("state");
+    const accept = callback.pathname === "/auth/callback" && embeddedCallbacks.get(state);
+    if (!accept) {
+        response.statusCode = 400;
+        response.end("Invalid state");
+        return;
+    }
+    return accept(request, response);
+}
+
 /** @returns {void} Close only our callback listeners */
 function closeListeners() {
     for (const listener of listeners.values()) {
@@ -315,4 +367,4 @@ function closeListeners() {
     listeners.clear();
 }
 
-module.exports = { begin, beginLocal, complete, pairing, closeListeners, transferOrigin };
+module.exports = { begin, beginLocal, complete, pairing, closeListeners, transferOrigin, embeddedOrigin, embeddedCallback };

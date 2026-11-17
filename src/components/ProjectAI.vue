@@ -1,17 +1,21 @@
 <template>
     <section class="ws-project-panel" data-testid="project-ai">
         <div class="ws-heading-row">
-            <div>
+            <div v-if="!guided">
                 <h2>{{ $t("projectPersonalAI") }}</h2>
                 <p class="ws-subtitle">{{ $t("projectAIReadOnly") }}</p>
             </div>
             <span class="ws-project-badge">{{ $t(`projectAIState_${settings.state || "off"}`) }}</span>
         </div>
+        <p v-if="guided" class="ws-channel-note">{{ $t("projectAIConnectHelp") }}</p>
         <p v-if="error" class="ws-form-error" role="alert">{{ $t(error) }}</p>
         <p v-if="notice" class="ws-test-state" role="status">{{ $t(notice) }}</p>
         <p v-if="worker?.enabled" class="ws-channel-note" role="status" data-testid="project-ai-worker">
             {{ $t(worker.connected ? "projectAIWorkerConnected" : "projectAIWorkerUnavailable") }}
             <span v-if="worker.label">· {{ worker.label }}</span>
+        </p>
+        <p v-if="anthropicWorkerOld" class="ws-channel-note" role="status">
+            {{ $t("projectAIWorkerNeedsUpdate") }}
         </p>
         <form
             v-if="canConfigure && loaded"
@@ -23,13 +27,19 @@
             <div class="ws-wizard-fields">
                 <label>
                     {{ $t("projectAIMode") }}
-                    <select v-model="form.mode" class="form-select" :aria-label="$t('projectAIMode')">
+                    <select
+                        v-model="form.mode"
+                        class="form-select"
+                        :aria-label="$t('projectAIMode')"
+                        @change="chooseConnection"
+                    >
                         <option value="off">{{ $t("projectAIWithout") }}</option>
-                        <option value="api">OpenAI API</option>
+                        <option value="api">{{ $t("projectAIOpenAIKey") }}</option>
                         <option value="subscription">{{ $t("projectAIChatGPTPlan") }}</option>
+                        <option value="anthropic">{{ $t("projectAIAnthropic") }}</option>
                     </select>
                 </label>
-                <label v-if="form.mode === 'api'">
+                <label v-if="keyMode">
                     {{ $t("projectAIKey") }}
                     <input
                         v-model="apiKey"
@@ -38,11 +48,28 @@
                         class="form-control"
                         autocomplete="new-password"
                         maxlength="4096"
-                        :placeholder="settings.hasSecret ? $t('stage2KeepSecret') : ''"
+                        spellcheck="false"
+                        name="provider-api-key"
+                        :required="!sameConnection || !settings.hasSecret"
+                        :placeholder="sameConnection && settings.hasSecret ? $t('stage2KeepSecret') : ''"
                     />
                     <small>{{ $t("projectAIKeyHelp") }}</small>
                 </label>
-                <label v-if="form.mode !== 'off'">
+                <p v-if="keyMode" class="ws-channel-note">
+                    <span v-if="form.mode === 'anthropic'" class="d-block mb-1">{{ $t("projectAIClaudePlanHelp") }}</span>
+                    <a
+                        :href="
+                            form.mode === 'anthropic'
+                                ? 'https://platform.claude.com/settings/keys'
+                                : 'https://platform.openai.com/api-keys'
+                        "
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {{ $t(form.mode === "anthropic" ? "projectAIGetClaudeKey" : "projectAIGetOpenAIKey") }}
+                    </a>
+                </p>
+                <label v-if="sameConnection && settings.models?.length && form.mode !== 'off'">
                     {{ $t("projectAIModel") }}
                     <select v-model="form.model" class="form-select" :aria-label="$t('projectAIModel')">
                         <option value="">{{ $t("projectAIChooseModel") }}</option>
@@ -51,57 +78,74 @@
                         </option>
                     </select>
                 </label>
-                <label v-if="form.mode !== 'off'">
-                    {{ $t("projectAIDailyRequests") }}
-                    <input
-                        v-model.number="form.dailyLimit"
-                        type="number"
-                        min="1"
-                        max="1000"
-                        class="form-control"
-                        required
-                    />
-                </label>
-                <label v-if="form.mode !== 'off'">
-                    {{ $t("projectAITimeLimit") }}
-                    <input
-                        v-model.number="form.timeoutSeconds"
-                        type="number"
-                        min="10"
-                        max="120"
-                        class="form-control"
-                        required
-                    />
-                </label>
-                <label v-if="form.mode === 'api'">
-                    {{ $t("projectAIAnswerLimit") }}
-                    <input
-                        v-model.number="form.maxOutputTokens"
-                        type="number"
-                        min="256"
-                        max="8192"
-                        class="form-control"
-                        required
-                    />
-                </label>
             </div>
-            <fieldset v-if="form.mode !== 'off'" class="ws-project-privacy">
-                <legend>{{ $t("projectAIDataConsent") }}</legend>
-                <label class="ws-wizard-checkbox">
-                    <input v-model="form.allowHistory" type="checkbox" />
-                    {{ $t("projectAIShareHistory") }}
-                </label>
-                <label class="ws-wizard-checkbox">
-                    <input v-model="form.allowNames" type="checkbox" />
-                    {{ $t("projectAIShareNames") }}
-                </label>
-                <label class="ws-wizard-checkbox">
-                    <input v-model="form.allowHosts" type="checkbox" />
-                    {{ $t("projectAIShareHosts") }}
-                </label>
-                <p class="ws-channel-note">{{ $t("projectAINoSecrets") }}</p>
-            </fieldset>
-            <p v-if="form.mode !== 'off'" class="ws-channel-note">{{ $t("projectAILimitsHonesty") }}</p>
+            <p v-if="sameConnection && settings.hasSecret && !settings.models?.length" class="ws-channel-note">
+                {{ $t("projectAILoadCatalogHint") }}
+            </p>
+            <p
+                v-if="sameConnection && settings.models?.length && settings.state !== 'verified'"
+                class="ws-channel-note"
+            >
+                {{ $t("projectAIChooseTestHint") }}
+            </p>
+            <details v-if="form.mode !== 'off'" class="ws-evidence-history">
+                <summary>{{ $t("projectAIExtraSettings") }}</summary>
+                <div class="ws-wizard-fields mt-3">
+                    <label>
+                        {{ $t("projectAIDailyRequests") }}
+                        <input
+                            v-model.number="form.dailyLimit"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            class="form-control"
+                            required
+                        />
+                    </label>
+                    <label v-if="form.mode !== 'off'">
+                        {{ $t("projectAITimeLimit") }}
+                        <input
+                            v-model.number="form.timeoutSeconds"
+                            type="number"
+                            min="10"
+                            max="120"
+                            class="form-control"
+                            required
+                        />
+                    </label>
+                    <label v-if="keyMode">
+                        {{ $t("projectAIAnswerLimit") }}
+                        <input
+                            v-model.number="form.maxOutputTokens"
+                            type="number"
+                            min="256"
+                            max="8192"
+                            class="form-control"
+                            required
+                        />
+                    </label>
+                </div>
+                <fieldset v-if="form.mode !== 'off'" class="ws-project-privacy">
+                    <legend>{{ $t("projectAIDataConsent") }}</legend>
+                    <label class="ws-wizard-checkbox">
+                        <input v-model="form.allowHistory" type="checkbox" />
+                        {{ $t("projectAIShareHistory") }}
+                    </label>
+                    <label class="ws-wizard-checkbox">
+                        <input v-model="form.allowNames" type="checkbox" />
+                        {{ $t("projectAIShareNames") }}
+                    </label>
+                    <label class="ws-wizard-checkbox">
+                        <input v-model="form.allowHosts" type="checkbox" />
+                        {{ $t("projectAIShareHosts") }}
+                    </label>
+                    <p class="ws-channel-note">{{ $t("projectAINoSecrets") }}</p>
+                </fieldset>
+                <p class="ws-channel-note">{{ $t("projectAILimitsHonesty") }}</p>
+            </details>
+            <p v-if="sameConnection && settings.model && settings.hasSecret" class="ws-channel-note">
+                {{ $t("projectAIProbeSpend") }}
+            </p>
             <p v-if="form.mode === 'subscription'" class="ws-channel-note">
                 {{ $t("projectAIPlanLimitHonesty") }}
                 <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">
@@ -113,19 +157,19 @@
                     {{ $t("Save") }}
                 </button>
                 <button
-                    v-if="settings.hasSecret && form.mode !== 'off'"
+                    v-if="sameConnection && settings.hasSecret && form.mode !== 'off'"
                     type="button"
                     class="ws-button ws-button-quiet"
-                    :disabled="busy || dirty"
+                    :disabled="busy || dirty || anthropicWorkerOld"
                     @click="loadModels"
                 >
                     {{ $t("projectAILoadModels") }}
                 </button>
                 <button
-                    v-if="settings.model && settings.hasSecret"
+                    v-if="sameConnection && settings.model && settings.hasSecret"
                     type="button"
                     class="ws-button ws-button-quiet"
-                    :disabled="busy || dirty || pending"
+                    :disabled="busy || dirty || pending || anthropicWorkerOld"
                     @click="probe"
                 >
                     {{ $t("projectAIProbe") }}
@@ -205,12 +249,12 @@
             </div>
         </section>
         <ProjectAIAutomation
-            v-if="canConfigure && loaded"
+            v-if="!guided && canConfigure && loaded"
             :key="`${projectId}-${settings.revision}-${publicState.projectRevision}`"
             :project-id="projectId"
         />
-        <h3 class="mt-4">{{ $t("projectAIHistory") }}</h3>
-        <p v-if="!jobs.length" class="ws-channel-note">{{ $t("projectAINoHistory") }}</p>
+        <h3 v-if="!guided || jobs.length" class="mt-4">{{ $t("projectAIHistory") }}</h3>
+        <p v-if="!guided && !jobs.length" class="ws-channel-note">{{ $t("projectAINoHistory") }}</p>
         <article
             v-for="job in jobs"
             :key="job.id"
@@ -303,6 +347,7 @@ export default {
     props: {
         projectId: { type: Number, required: true },
         role: { type: String, required: true },
+        guided: { type: Boolean, default: false },
         selectedMonitor: { type: Object, default: null },
         publicState: { type: Object, default: () => ({ state: "off" }) },
     },
@@ -331,6 +376,20 @@ export default {
     computed: {
         canConfigure() {
             return this.role === "admin";
+        },
+        keyMode() {
+            return ["api", "anthropic"].includes(this.form.mode);
+        },
+        sameConnection() {
+            return this.form.mode === this.settings.mode;
+        },
+        anthropicWorkerOld() {
+            return (
+                this.form.mode === "anthropic" &&
+                this.worker?.enabled &&
+                this.worker.connected &&
+                !this.worker.providers?.includes("anthropic")
+            );
         },
         canDiagnose() {
             return ["admin", "operator"].includes(this.role);
@@ -372,6 +431,15 @@ export default {
         this.authorizationURL = "";
     },
     methods: {
+        /** @returns {void} Keep a draft key and model with the provider they were chosen for. */
+        chooseConnection() {
+            this.apiKey = "";
+            this.form.model = this.sameConnection ? this.settings.model : "";
+            this.form.allowHistory = this.sameConnection && this.settings.allowHistory;
+            this.form.allowNames = this.sameConnection && this.settings.allowNames;
+            this.form.allowHosts = this.sameConnection && this.settings.allowHosts;
+            this.authorizationURL = "";
+        },
         /**
          * @param {boolean} force Discard a stale local form after an explicit refresh
          * @returns {Promise<void>} Refresh local facts without making any inference request
@@ -461,7 +529,7 @@ export default {
             const result = await this.act("projectAIModels", { revision: this.settings.revision });
             if (result) {
                 this.settings.models = result.models;
-                this.notice = "projectAIModelsLoaded";
+                this.notice = result.models.length ? "projectAIModelsLoaded" : "projectAICatalogEmpty";
             }
         },
         /** @returns {Promise<void>} Probe success is recorded only by the completed worker */

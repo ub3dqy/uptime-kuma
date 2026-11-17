@@ -1,3 +1,4 @@
+import { e2eOwnerPassword, getSetupCode } from "../util-test";
 import { expect, test } from "@playwright/test";
 import { io } from "socket.io-client";
 import fs from "node:fs";
@@ -75,9 +76,9 @@ test.beforeAll(async ({ baseURL }) => {
     fs.writeFileSync(path.join(folder, "control.json"), JSON.stringify({ mode: "up", rejectMail: false }));
     owner = await connect(baseURL);
     if (await owner.timeout(10000).emitWithAck("needSetup")) {
-        await call(owner, "setup", "admin", "admin123");
+        await call(owner, "setup", { username: "admin", password: e2eOwnerPassword, code: getSetupCode() });
     }
-    people.owner = await call(owner, "login", { username: "admin", password: "admin123", token: "" });
+    people.owner = await call(owner, "login", { username: "admin", password: e2eOwnerPassword, token: "" });
     projectID = (
         await call(owner, "projectCreate", {
             name: "Stage3 isolated project",
@@ -329,6 +330,7 @@ test("subscription login uses issued identity, validates callback and needs its 
     const auth = new URL(await link.getAttribute("href"));
     expect(auth.hostname).toBe("127.0.0.1"); // Test-only fake authorization peer; never a real account.
     const callback = new URL(auth.searchParams.get("redirect_uri"));
+    expect(callback.origin).toBe(new URL(page.url()).origin);
     callback.search = "?state=wrong&code=wrong";
     expect((await fetch(callback)).status).toBe(400);
     const popup = await context.newPage();

@@ -1,3 +1,4 @@
+import { e2eOwnerPassword, getSetupCode } from "../util-test";
 import { test, expect } from "@playwright/test";
 import { io } from "socket.io-client";
 import fs from "node:fs";
@@ -115,7 +116,7 @@ async function confirmation(panel, operation) {
     const form = panel.getByTestId("recovery-confirmation");
     await expect(form).toBeVisible();
     await form.getByRole("checkbox").check();
-    await form.getByLabel("Current Password", { exact: true }).fill("admin123");
+    await form.getByLabel("Current Password", { exact: true }).fill(e2eOwnerPassword);
     return form;
 }
 
@@ -123,9 +124,9 @@ test.beforeAll(async ({ baseURL }) => {
     test.setTimeout(90000);
     owner = await connect(baseURL);
     if (await owner.timeout(10000).emitWithAck("needSetup")) {
-        await call(owner, "setup", "admin", "admin123");
+        await call(owner, "setup", { username: "admin", password: e2eOwnerPassword, code: getSetupCode() });
     }
-    ownerToken = (await call(owner, "login", { username: "admin", password: "admin123", token: "" })).token;
+    ownerToken = (await call(owner, "login", { username: "admin", password: e2eOwnerPassword, token: "" })).token;
     const fixture = JSON.parse(fs.readFileSync(path.join(folder, "recovery-fixture.json"), "utf8"));
     const targets = [];
     for (const name of ["first", "second"]) {
@@ -277,7 +278,7 @@ test("owner reviews AI facts, approves once, receives two actual HTTP successes 
     await form.getByRole("button", { name: tr("projectRecoveryConfirm"), exact: true }).click();
     await expect(form).toContainText(tr("projectRecoveryPassword"));
     expect(fs.readFileSync(value.file, "utf8")).toBe(value.before);
-    await form.getByLabel("Current Password", { exact: true }).fill("admin123");
+    await form.getByLabel("Current Password", { exact: true }).fill(e2eOwnerPassword);
     await form.getByRole("button", { name: tr("projectRecoveryConfirm"), exact: true }).click();
     await expect.poll(() => fs.readFileSync(value.file, "utf8"), { timeout: 30000 }).toBe(value.after);
     await expect(panel).toContainText(tr("projectRecoveryStatus_verifying"), { timeout: 10000 });

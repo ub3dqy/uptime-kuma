@@ -1,3 +1,4 @@
+import { e2eOwnerPassword, getSetupCode } from "../util-test";
 import { test, expect } from "@playwright/test";
 import { io } from "socket.io-client";
 import fs from "node:fs";
@@ -31,10 +32,10 @@ test("fixed site recovery: owner confirmation, actual HTTP checks, retained copy
     let monitorID;
     try {
         if (await socket.timeout(10000).emitWithAck("needSetup")) {
-            const setup = await socket.timeout(10000).emitWithAck("setup", "admin", "admin123");
+            const setup = await socket.timeout(10000).emitWithAck("setup", { username: "admin", password: e2eOwnerPassword, code: getSetupCode() });
             expect(setup.ok).toBe(true);
         }
-        const login = await call("login", { username: "admin", password: "admin123", token: "" });
+        const login = await call("login", { username: "admin", password: e2eOwnerPassword, token: "" });
         const folder = process.env.KUMA_STAGE2_FIXTURE_DIR;
         const app = JSON.parse(fs.readFileSync(path.join(folder, "recovery-fixture.json"))).apps.first;
         projectID = (await call("projectCreate", { name: "Fixed site recovery", allowedIPs: ["127.0.0.1"] })).id;
@@ -115,7 +116,7 @@ test("fixed site recovery: owner confirmation, actual HTTP checks, retained copy
         await expect(form.getByRole("button", { name: tr("projectRecoveryConfirm"), exact: true })).toBeDisabled();
         expect(fs.readFileSync(app.file, "utf8")).toBe(app.before);
         await form.getByRole("checkbox").check();
-        await form.getByLabel("Current Password", { exact: true }).fill("admin123");
+        await form.getByLabel("Current Password", { exact: true }).fill(e2eOwnerPassword);
         await form.getByRole("button", { name: tr("projectRecoveryConfirm"), exact: true }).click();
         await expect
             .poll(async () => (await call("projectSiteRecoveryGet", { projectID })).jobs[0]?.status, { timeout: 70000 })
@@ -131,7 +132,7 @@ test("fixed site recovery: owner confirmation, actual HTTP checks, retained copy
         });
         await panel.getByRole("button", { name: tr("projectRecoveryReturn"), exact: true }).click();
         await form.getByRole("checkbox").check();
-        await form.getByLabel("Current Password", { exact: true }).fill("admin123");
+        await form.getByLabel("Current Password", { exact: true }).fill(e2eOwnerPassword);
         await form.getByRole("button", { name: tr("projectRecoveryConfirm"), exact: true }).click();
         await expect
             .poll(async () => (await call("projectSiteRecoveryGet", { projectID })).jobs[0]?.status, { timeout: 90000 })

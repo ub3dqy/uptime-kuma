@@ -175,8 +175,8 @@
                 <button v-if="services.length" type="button" class="ws-button ws-button-quiet" @click="resetFilters">
                     {{ $t("workspaceResetFilters") }}
                 </button>
-                <router-link v-else to="/add" class="ws-button ws-button-primary">
-                    {{ $t("workspaceAddService") }}
+                <router-link v-else to="/start" class="ws-button ws-button-primary">
+                    {{ $t("startTitle") }}
                 </router-link>
             </div>
         </div>

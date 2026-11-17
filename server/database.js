@@ -138,7 +138,7 @@ class Database {
 
         Database.sqlitePath = path.join(Database.dataDir, "kuma.db");
         if (!fs.existsSync(Database.dataDir)) {
-            fs.mkdirSync(Database.dataDir, { recursive: true });
+            fs.mkdirSync(Database.dataDir, { recursive: true, mode: 0o700 });
         }
 
         Database.uploadDir = path.join(Database.dataDir, "upload/");
@@ -208,7 +208,7 @@ class Database {
         let dbConfigString = fs.readFileSync(path.join(Database.dataDir, "db-config.json")).toString("utf-8");
         dbConfig = JSON.parse(dbConfigString);
 
-        if (typeof dbConfig !== "object") {
+        if (!dbConfig || typeof dbConfig !== "object" || Array.isArray(dbConfig)) {
             throw new Error("Invalid db-config.json, it must be an object");
         }
 
@@ -224,7 +224,14 @@ class Database {
      * @returns {void}
      */
     static writeDBConfig(dbConfig) {
-        fs.writeFileSync(path.join(Database.dataDir, "db-config.json"), JSON.stringify(dbConfig, null, 4));
+        const file = path.join(Database.dataDir, "db-config.json");
+        const temporary = file + "." + require("node:crypto").randomUUID() + ".tmp";
+        try {
+            fs.writeFileSync(temporary, JSON.stringify(dbConfig, null, 4), { flag: "wx", mode: 0o600, flush: true });
+            fs.renameSync(temporary, file);
+        } finally {
+            fs.rmSync(temporary, { force: true });
+        }
     }
 
     /**

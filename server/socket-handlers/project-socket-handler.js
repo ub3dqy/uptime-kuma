@@ -214,7 +214,7 @@ function projectSocketHandler(socket, services) {
             if (!services.localSignIn) {
                 throw problem("projectSignInNeedsHelper");
             }
-            return subscription.beginLocal(userID, request, guard, await services.baseURL());
+            return subscription.beginLocal(userID, request, guard, await services.baseURL(), services.callbackOrigin);
         },
         projectAIPairing: async (userID, request, guard) => ({
             pairing: await subscription.begin(userID, request, guard, await services.baseURL()),

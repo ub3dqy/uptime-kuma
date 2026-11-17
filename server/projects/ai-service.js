@@ -3,6 +3,7 @@ const { createHash } = require("node:crypto");
 const { permit, id, problem, audit } = require("./access");
 const { getVault } = require("./vault");
 const { OpenAIClient, AIError } = require("./openai-client");
+const { AnthropicClient } = require("./anthropic-client");
 const { parentIsInactive } = require("./store");
 const { currentServiceState, issueExplanation, serviceHost, observationTime } = require("../../src/overview-state.ts");
 const { workFromBeat } = require("../../src/site-work.ts");
@@ -10,9 +11,13 @@ const active = new Map();
 const locks = new Map();
 let clientOverride;
 
-/** @returns {OpenAIClient} Fixed official client except in the isolated test harness */
-function client() {
-    return clientOverride || new OpenAIClient({ fetch: require("../ai-worker/transport").fetchForInstallation() });
+/**
+ * @param {string} mode Closed saved connection type
+ * @returns {OpenAIClient|AnthropicClient} Official provider client for this project
+ */
+function client(mode = "api") {
+    const Provider = mode === "anthropic" ? AnthropicClient : OpenAIClient;
+    return clientOverride || new Provider({ fetch: require("../ai-worker/transport").fetchForInstallation() });
 }
 /**
  * @param {OpenAIClient} value Test-only dependency
@@ -155,7 +160,7 @@ async function saveSettings(userID, request, guard) {
         await guard();
         await permit(userID, projectID, "admin");
         const current = await R.knex("project_ai").where({ project_id: projectID }).first();
-        if (current.revision !== request.revision || !["off", "api", "subscription"].includes(request.mode)) {
+        if (current.revision !== request.revision || !["off", "api", "subscription", "anthropic"].includes(request.mode)) {
             throw problem("projectChanged");
         }
         const values = {
@@ -166,7 +171,7 @@ async function saveSettings(userID, request, guard) {
             max_output_tokens: integer(request.maxOutputTokens, 256, 8192),
             allow_names: request.allowNames === true ? 1 : 0,
             allow_hosts: request.allowHosts === true ? 1 : 0,
-            allow_history: request.allowHistory !== false ? 1 : 0,
+            allow_history: request.allowHistory === true ? 1 : 0,
             revision: current.revision + 1,
             verified_at: null,
             error_code: null,
@@ -181,14 +186,15 @@ async function saveSettings(userID, request, guard) {
         if (values.model && (typeof values.model !== "string" || !models.some((model) => model.id === values.model))) {
             throw problem("projectAIChooseModel");
         }
-        let secret = current.secret_cipher ? secretFor(current) : null;
-        if (request.mode === "api") {
+        const sameConnection = current.mode === request.mode;
+        let secret = sameConnection && current.secret_cipher ? secretFor(current) : null;
+        if (request.mode === "api" || request.mode === "anthropic") {
             if (request.apiKey) {
                 if (typeof request.apiKey !== "string" || !/^[\x21-\x7e]{16,4096}$/.test(request.apiKey)) {
                     throw problem("projectAIKeyRequired");
                 }
-                secret = { kind: "api", api_key: request.apiKey };
-            } else if (secret?.kind !== "api") {
+                secret = { kind: "api", mode: request.mode, api_key: request.apiKey };
+            } else if (secret?.kind !== "api" || (secret.mode || "api") !== request.mode) {
                 throw problem("projectAIKeyRequired");
             }
         } else if (request.mode === "subscription" && secret?.kind !== "subscription") {
@@ -204,9 +210,15 @@ async function saveSettings(userID, request, guard) {
             secret = null;
         }
         values.secret_cipher = secret ? getVault().seal(projectID, secret) : null;
-        if (request.mode !== current.mode || request.apiKey) {
+        if (!sameConnection || request.apiKey) {
             values.models_json = null;
             values.model = null;
+        }
+        if (!sameConnection) {
+            values.registration_json = null;
+            values.allow_names = 0;
+            values.allow_hosts = 0;
+            values.allow_history = 0;
         }
         await R.knex.transaction(async (tx) => {
             await guard(tx);
@@ -216,6 +228,11 @@ async function saveSettings(userID, request, guard) {
                 .update(values);
             if (!changed) {
                 throw problem("projectChanged");
+            }
+            if (!sameConnection && current.mode !== "off") {
+                await tx("project_ai_automation")
+                    .where({ project_id: projectID, enabled: 1 })
+                    .update({ enabled: 0, updated_at: Date.now() });
             }
             await tx("project_ai_job")
                 .where({ project_id: projectID, status: "queued" })
@@ -237,7 +254,7 @@ async function saveSettings(userID, request, guard) {
  */
 async function bearer(row, signal) {
     let secret = secretFor(row);
-    if (row.mode === "api" && secret.kind === "api") {
+    if (["api", "anthropic"].includes(row.mode) && secret.kind === "api" && (secret.mode || "api") === row.mode) {
         return secret.api_key;
     }
     if (row.mode !== "subscription" || secret.kind !== "subscription") {
@@ -290,7 +307,7 @@ async function models(userID, request, guard) {
         const token = await bearer(row, signal);
         await guard();
         await permit(userID, projectID, "admin");
-        const catalog = await client().models(token, row.mode, signal);
+        const catalog = await client(row.mode).models(token, row.mode, signal);
         await R.knex.transaction(async (tx) => {
             await guard(tx);
             await permit(userID, projectID, "admin", tx);
@@ -664,7 +681,7 @@ class AIWorker {
             const evidence = job.code_input_cipher
                 ? getVault().open(job.project_id, job.code_input_cipher, "code")
                 : JSON.parse(job.input_json);
-            const answer = await client().diagnose(row, token, evidence, controller.signal);
+            const answer = await client(row.mode).diagnose(row, token, evidence, controller.signal);
             // Known bearer credentials must never reappear in a provider's returned text.
             let result = JSON.stringify(answer.result);
             const secret = secretFor(await valid());

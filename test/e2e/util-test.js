@@ -2,9 +2,16 @@ const fs = require("fs");
 const path = require("path");
 const serverUrl = process.env.KUMA_E2E_SERVER_URL || require("../../config/playwright.config.js").url;
 
+export const e2eOwnerPassword = "Kuma-dev-owner-sample-382";
+
 const dbPath = process.env.KUMA_E2E_DB_PATH
     ? path.resolve(process.env.KUMA_E2E_DB_PATH)
     : "./../../data/playwright-test/kuma.db";
+
+/** @returns {string} Code from the isolated application's private data folder. */
+export function getSetupCode() {
+    return fs.readFileSync(path.join(path.dirname(path.resolve(__dirname, dbPath)), ".setup-code"), "utf8").trim();
+}
 
 /**
  * @param {TestInfo} testInfo Test info
@@ -28,7 +35,7 @@ export async function login(page) {
     await page.getByPlaceholder("Username").click();
     await page.getByPlaceholder("Username").fill("admin");
     await page.getByPlaceholder("Username").press("Tab");
-    await page.getByPlaceholder("Password").fill("admin123");
+    await page.getByPlaceholder("Password").fill(e2eOwnerPassword);
     await page.getByLabel("Remember me").check();
     await page.getByRole("button", { name: "Log in" }).click();
     await page.isVisible("text=Add New Monitor");

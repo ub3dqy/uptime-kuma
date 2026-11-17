@@ -13,12 +13,16 @@ process.env.KUMA_E2E_SERVER_URL = url;
 export default defineConfig({
     testDir: "../test/e2e/specs",
     testMatch:
-        /(?:workspace|client-groups|heartbeat-export|stage2-workflow|stage3-projects|stage4-recovery|site-work|site-recovery|code-recovery)\.spec\.js/,
+        /(?:first-start|workspace|client-groups|heartbeat-export|stage2-workflow|stage3-projects|stage4-recovery|site-work|site-recovery|code-recovery)\.spec\.js/,
     outputDir: `../${dataDir}/results`,
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
     retries: 0,
     workers: 1,
+    projects: [
+        { name: "first-run", testMatch: /first-start\.spec\.js$/ },
+        { name: "workspace", testIgnore: /first-start\.spec\.js$/, dependencies: ["first-run"] },
+    ],
     reporter: [["list"], ["html", { outputFolder: path.resolve(dataDir, "report"), open: "never" }]],
     use: {
         ...devices["Desktop Chrome"],
@@ -37,6 +41,7 @@ export default defineConfig({
             UPTIME_KUMA_DB_TYPE: "sqlite",
             UPTIME_KUMA_ENABLE_EMBEDDED_MARIADB: "0",
             UPTIME_KUMA_LOCAL_OAUTH: "1",
+            UPTIME_KUMA_LOCAL_OAUTH_ORIGIN: url,
         },
     },
 });

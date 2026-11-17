@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
-import { login } from "../util-test";
+import { e2eOwnerPassword, getSetupCode, login } from "../util-test";
 
 const databasePath = process.env.KUMA_E2E_DB_PATH || "data/playwright-test/kuma.db";
 
@@ -48,14 +48,20 @@ test.describe("Client groups and printable reports", () => {
         await page.waitForSelector("form, [data-testid='monitor-list']");
         if (await page.getByText("SQLite", { exact: true }).isVisible()) {
             await page.getByText("SQLite", { exact: true }).click();
+            await page.getByLabel("Installation code").fill(getSetupCode());
             await page.getByRole("button", { name: "Next", exact: true }).click();
             await page.getByPlaceholder("Username").waitFor();
         }
         if (await page.getByPlaceholder("Repeat Password").isVisible()) {
             await page.getByPlaceholder("Username").fill("admin");
-            await page.getByPlaceholder("Password", { exact: true }).fill("admin123");
-            await page.getByPlaceholder("Repeat Password").fill("admin123");
-            await page.getByRole("button", { name: "Create", exact: true }).click();
+            if (await page.getByLabel("Installation code").isVisible()) {
+                await page.getByLabel("Installation code").fill(getSetupCode());
+            }
+            await page.getByPlaceholder("Password", { exact: true }).fill(e2eOwnerPassword);
+            await page.getByPlaceholder("Repeat Password").fill(e2eOwnerPassword);
+            await page.getByRole("button", { name: "Create account", exact: true }).click();
+            await page.waitForURL("/start");
+            await page.goto("/dashboard");
         } else if (await page.getByPlaceholder("Username").isVisible()) {
             await login(page);
         }

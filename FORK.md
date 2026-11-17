@@ -1,35 +1,35 @@
 # Uptime Kuma · ub3dqy edition
 
-Monitor client websites on your own server, see when they were down, and share a printable report for each client.
 
-[Try the preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2) · [Product overview](README.md) · [Русская версия](FORK.ru.md)
+[Current preview](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.3) · [Features and screenshots](README.md) · [Русская версия](FORK.ru.md)
 
-This independent preview is based on Uptime Kuma 2.5.8, originally created by Louis Lam and contributors. It is maintained by Dima Mak / ub3dqy and uses the MIT license.
+This independent edition is based on Uptime Kuma 2.5.8, originally created by Louis Lam and contributors. It is maintained by Dima Mak / ub3dqy and uses the MIT license.
 
 ## Installation
 
-Use this preview for an independent trial with a fresh data volume. The ready-to-run archive requires Docker with Linux x86-64 containers. Docker Desktop users can run it with the Linux engine. The setup below uses SQLite.
+For a new installation, follow [Getting started](README.md#quick-start). The launch files build the preview and open the local dashboard. Docker Desktop should use Linux containers. Docker Engine 28 or later and Docker Compose are required by the launch files.
 
-1. Download `kuma-preview-linux-amd64.tar.gz` and `SHA256SUMS.txt` from the [preview release](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.2). Compare the archive’s SHA-256 with the published value. Run `sha256sum kuma-preview-linux-amd64.tar.gz` on Linux or `Get-FileHash .\kuma-preview-linux-amd64.tar.gz` in PowerShell.
-2. In the download directory, run:
+### Run the checked Docker archive
 
-   ```sh
-   docker load -i kuma-preview-linux-amd64.tar.gz
-   docker run --pull=never -d --name uptime-kuma-preview -p 127.0.0.1:3001:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.2
-   ```
+1. Download `kuma-preview-linux-amd64.tar.gz` and `SHA256SUMS.txt` from the [preview release](https://github.com/ub3dqy/uptime-kuma/releases/tag/v2.5.8-ub3dqy.preview.3). Compare the SHA-256 using `sha256sum kuma-preview-linux-amd64.tar.gz` on Linux or `Get-FileHash .\kuma-preview-linux-amd64.tar.gz` in PowerShell.
+2. Run the commands below in the download folder.
+3. Open the printed link on the same computer and create the owner account. Keep the first-run link private.
 
-3. Open <http://127.0.0.1:3001>, select **SQLite**, and create an administrator account. For a remote host, forward the port with `ssh -N -L 3001:127.0.0.1:3001 user@server`. If 3001 is taken on the Docker host, change the first 3001 in the run command and use the chosen port in the browser.
-4. Add two HTTP(S) monitors. Open **Reports**, name your group, choose both monitors, and save it. With some checks recorded, choose a period and click **Open period report**. Choose **Print / save PDF** to save a copy in your browser.
+```sh
+docker load -i kuma-preview-linux-amd64.tar.gz
+docker run --pull=never -d --name uptime-kuma-preview --init --read-only --cap-drop=ALL --security-opt=no-new-privileges:true --tmpfs /tmp:rw,size=128m,mode=1777 --log-opt max-size=10m --log-opt max-file=3 -p 127.0.0.1:3001:3001 -e UPTIME_KUMA_LOCAL_OAUTH=1 -e UPTIME_KUMA_LOCAL_OAUTH_ORIGIN=http://127.0.0.1:3001 -v uptime-kuma-preview-data:/app/data ub3dqy/uptime-kuma:2.5.8-ub3dqy.preview.3
+docker exec uptime-kuma-preview node extra/first-run-url.cjs 3001
+```
 
-The report is based on retained observations. Pick a recent period for the first run. The report shows how much of the period was observed, and labels any time without data.
+The ready-to-run archive uses Linux x86-64 containers. The preview disables JSONata expression checks. Start with a fresh named volume. Use `docker stop uptime-kuma-preview` and `docker start uptime-kuma-preview` to stop and resume while retaining your data.
 
-Use `docker stop uptime-kuma-preview` to stop and `docker start uptime-kuma-preview` to resume. The named volume preserves the data between starts. Keep a separate copy of the volume before trying an update. New preview builds are listed under [Releases](https://github.com/ub3dqy/uptime-kuma/releases).
+### Backups and server access
 
-JSONata expression checks are disabled in the ready-to-run preview, including checks that use saved expressions. Use plain HTTP(S) checks for the trial.
+Keep a copy of the entire data volume and the previous image before upgrading. Restore the volume into a separate installation to verify that the monitor list, history and alert settings are readable. [Docker volume export](https://docs.docker.com/desktop/use-desktop/volumes/)
 
-**Build from source.** Use Node.js 24.22.3 LTS or later in the 24.x series and npm 12.2.1. Clone `v2.5.8-ub3dqy.preview.2`, then run `npm run setup` from the checkout. Start with `UPTIME_KUMA_DISABLE_JSONATA=1 node server/server.js --host=127.0.0.1 --port=3001` in a POSIX shell. In PowerShell set `$env:UPTIME_KUMA_DISABLE_JSONATA = '1'` before the same `node` command.
+On a separate server, keep the dashboard on loopback during setup. On your computer, open an SSH tunnel with `ssh -N -L 3001:127.0.0.1:3001 admin@server.example.com` and use the first-run link printed on the server. Configure HTTPS before offering permanent access over the network. Test migrations on a copy first, including any external database.
 
-[Report a bug](https://github.com/ub3dqy/uptime-kuma/issues/new?template=bug_report.yml) · [Suggest an improvement](https://github.com/ub3dqy/uptime-kuma/issues/new?template=feature_request.yml)
+[Guided setup and troubleshooting](docs/FIRST-STEPS.ru.md) · [Project roles and AI](docs/PROJECTS-AND-AI.ru.md)
 
 ## First addition: retained check history as CSV
 

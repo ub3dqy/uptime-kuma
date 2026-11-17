@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createServer } from "node:http";
 import { io } from "socket.io-client";
 import Database from "better-sqlite3";
-import { login } from "../util-test";
+import { e2eOwnerPassword, getSetupCode, login } from "../util-test";
 
 const unsafeName = 'Sites/Local <img src=x onerror="window.workspaceUnsafe=true">';
 let peer;
@@ -54,9 +54,9 @@ test.beforeAll(async ({ baseURL }) => {
         });
         const needSetup = await socket.timeout(10000).emitWithAck("needSetup");
         if (needSetup) {
-            await call(socket, "setup", "admin", "admin123");
+            await call(socket, "setup", { username: "admin", password: e2eOwnerPassword, code: getSetupCode() });
         }
-        await call(socket, "login", { username: "admin", password: "admin123", token: "" });
+        await call(socket, "login", { username: "admin", password: e2eOwnerPassword, token: "" });
         const settings = await call(socket, "getSettings");
         await call(socket, "setSettings", { ...settings.data, nscd: false }, null);
         let liveEvidence;
@@ -241,8 +241,12 @@ test("navigation reaches settings, history, monitors and notification forms", as
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await expect(page).toHaveURL(/\/settings\/general$/);
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Getting started", exact: true }).click();
+    await expect(page).toHaveURL(/\/start$/);
+    await expect(page.getByTestId("getting-started")).toBeVisible();
+    await page.goto("/settings/general");
     const settingsLinks = await page
-        .locator(".settings-menu a[href]")
+        .locator('.settings-menu a[href^="/settings/"]')
         .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
     for (const href of settingsLinks) {
         await page.locator(`.settings-menu a[href="${href}"]`).click();

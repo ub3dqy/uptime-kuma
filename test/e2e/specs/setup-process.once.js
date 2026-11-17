@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { getSqliteDatabaseExists, login, screenshot, takeSqliteSnapshot } from "../util-test";
+import { e2eOwnerPassword, getSetupCode, getSqliteDatabaseExists, login, screenshot, takeSqliteSnapshot } from "../util-test";
 
 test.describe("Uptime Kuma Setup", () => {
     test.skip(() => getSqliteDatabaseExists(), "Must only run once per session");
@@ -15,6 +15,7 @@ test.describe("Uptime Kuma Setup", () => {
     test("setup sqlite", async ({ page }, testInfo) => {
         await page.goto("./");
         await page.getByText("SQLite").click();
+        await page.getByLabel("Installation code").fill(getSetupCode());
         await page.getByRole("button", { name: "Next" }).click();
         await screenshot(testInfo, page);
         await page.waitForURL("/setup"); // ensures the server is ready to continue to the next test
@@ -22,13 +23,15 @@ test.describe("Uptime Kuma Setup", () => {
 
     test("setup admin", async ({ page }) => {
         await page.goto("./");
+        await page.getByLabel("Installation code").fill(getSetupCode());
         await page.getByPlaceholder("Username").click();
         await page.getByPlaceholder("Username").fill("admin");
         await page.getByPlaceholder("Username").press("Tab");
-        await page.getByPlaceholder("Password", { exact: true }).fill("admin123");
+        await page.getByPlaceholder("Password", { exact: true }).fill(e2eOwnerPassword);
         await page.getByPlaceholder("Password", { exact: true }).press("Tab");
-        await page.getByPlaceholder("Repeat Password").fill("admin123");
-        await page.getByRole("button", { name: "Create" }).click();
+        await page.getByPlaceholder("Repeat Password").fill(e2eOwnerPassword);
+        await page.getByRole("button", { name: "Create account", exact: true }).click();
+        await page.waitForURL("/start");
     });
 
     /*

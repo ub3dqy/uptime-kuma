@@ -108,13 +108,20 @@ async function status() {
     if (!healthPromise) {
         healthPromise = (async () => {
             let connected = false;
+            let providers = [];
             try {
                 const result = await rpc(config, { action: "health" }, { signal: AbortSignal.timeout(4000) });
                 connected = result.ready === true;
+                if (connected) {
+                    providers = ["openai"];
+                    if (Array.isArray(result.providers) && result.providers.includes("anthropic")) {
+                        providers.push("anthropic");
+                    }
+                }
             } catch {
                 /* Preserve credentials and the last actual observation on a network failure. */
             }
-            healthValue = { enabled: true, connected, label: config.label, lastSeen };
+            healthValue = { enabled: true, connected, label: config.label, lastSeen, providers };
             healthUntil = Date.now() + 15000;
             return healthValue;
         })().finally(() => {

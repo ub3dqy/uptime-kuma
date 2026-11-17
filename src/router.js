@@ -15,6 +15,7 @@ const NotificationsHome = () => import("./pages/NotificationsHome.vue");
 const Projects = () => import("./pages/Projects.vue");
 const JoinProject = () => import("./pages/JoinProject.vue");
 const ProjectAccount = () => import("./pages/ProjectAccount.vue");
+const GettingStarted = () => import("./pages/GettingStarted.vue");
 import Setup from "./pages/Setup.vue";
 import StatusPage from "./pages/StatusPage.vue";
 import Entry from "./pages/Entry.vue";
@@ -160,6 +161,7 @@ const routes = [
                         component: Projects,
                     },
                     { path: "/account", component: ProjectAccount },
+                    { path: "/start", component: GettingStarted },
                     {
                         name: "Events",
                         path: "/events",

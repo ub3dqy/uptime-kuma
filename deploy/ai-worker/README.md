@@ -2,25 +2,20 @@
 
 The monitoring instance owns projects, roles, individual encrypted ChatGPT/API
 credentials, evidence consent, budgets and recovery approvals. The separate
-service performs only the fixed OpenAI HTTPS operations. It cannot execute
+service performs only the fixed OpenAI and Anthropic HTTPS operations. It cannot execute
 commands, operate recovery recipes, or call the monitoring API. No account
 credentials or evidence are retained on its disk. Its SQLite ledger retains
 only request identities, timestamps and outcomes, without an expiry policy.
 The supplied container disables core dumps and memory swapping. Do not enable
 application request logging or an external crash collector containing memory.
 
-For a two-server installation, use a separately qualified immutable image
-under `/srv/uptime-kuma-ai-worker` on your worker host. Run only this Compose
+For a two-server installation, use a separately qualified immutable image from
+the same edition as the main app. Place it under `/srv/uptime-kuma-ai-worker` on
+your independent host. Run only this Compose
 project (`uptime-kuma-ai-worker`). Port 3047 is published on host loopback only.
 The configuration is an ordinary, single-link, mode-0600 file owned by UID 1000:
 `{"version":1,"workerID":"<opaque stable installation ID>","secret":"<32 random bytes as base64url>"}`.
 The data directory must be UID 1000 and mode 0700. Never put either file in Git.
-
-Copy the SSH templates to your own configuration directory and replace
-`__PEER_IPV4__` with the worker address, `__PRIMARY_IPV4__` with the
-primary server address and `__DOCKER_GATEWAY_IPV4__` with the gateway of
-your Kuma Docker network. In documentation, `192.0.2.10` and
-`198.51.100.20` are example addresses for the primary and worker servers.
 
 Generate a new dedicated SSH key on the primary host under
 `/var/lib/uptime-kuma-ai-tunnel`. Do not reuse an owner's key or broaden the
@@ -36,8 +31,8 @@ on that bridge's actual interface, source subnet and gateway. Never open either
 AI port to the Internet. Confirm the bridge identity before installation.
 
 On the primary, create `data/ai-worker/config.json` (parent 0700, file 0600,
-UID 1000), using `http://__DOCKER_GATEWAY_IPV4__:19087` as the endpoint
-after substituting your gateway. Use a label such as `AI worker`. An absent configuration
+UID 1000), adding `endpoint: "http://<bridge-gateway>:19087"` and
+`label: "AI worker"` to the same worker identity. An absent configuration
 preserves local installations; an invalid explicit configuration fails closed.
 Requests and replies are encrypted with AES-256-GCM, separately signed with
 HMAC-SHA256 and bound to a fresh nonce, timestamp and request identity. Redirects
@@ -46,7 +41,7 @@ requests survive restart as uncertain and are never automatically replayed.
 
 The connection badge is a signed health check to this service, not an inference
 or proof of account access. Each project administrator must complete their own
-official ChatGPT sign-in or enter their API key, select an account-specific
+official ChatGPT sign-in or enter their OpenAI or Claude Console API key, select an account-specific
 model, then explicitly test it. A partial stream is never a completed result.
 Automatic diagnosis and owner-approved recovery keep their existing gates.
 

@@ -1,6 +1,15 @@
 <template>
     <div>
         <StatusPage v-if="statusPageSlug" :override-slug="statusPageSlug" />
+        <main v-else-if="error" class="workspace-shell ws-access" :class="{ dark: $root.isDark }">
+            <section class="ws-access-panel">
+                <h1>Uptime Kuma</h1>
+                <p role="alert">{{ $t("setupConnectionFailed") }}</p>
+                <button type="button" class="ws-button ws-button-primary" @click="retry">
+                    {{ $t("setupTryAgain") }}
+                </button>
+            </section>
+        </main>
     </div>
 </template>
 
@@ -15,6 +24,7 @@ export default {
     data() {
         return {
             statusPageSlug: null,
+            error: false,
         };
     },
     async mounted() {
@@ -43,9 +53,15 @@ export default {
             } else {
                 this.$router.push("/dashboard");
             }
-        } catch (e) {
-            alert("Cannot connect to the backend server. Did you start the backend server? (npm run start-server-dev)");
+        } catch {
+            this.error = true;
         }
+    },
+    methods: {
+        /** @returns {void} Retry loading the local panel. */
+        retry() {
+            window.location.reload();
+        },
     },
 };
 </script>
